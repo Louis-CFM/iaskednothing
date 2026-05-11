@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<link rel="stylesheet" href="site.css">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Journal — I asked nothing</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -300,6 +301,7 @@ footer a {
 footer a:hover { color: var(--text); }
 
 </style>
+<style>#hd{display:none!important}</style>
 </head>
 <body>
 
@@ -719,5 +721,6 @@ const spyObserver = new IntersectionObserver(es => {
 entryEls.forEach(e => { if (e.id) spyObserver.observe(e); });
 </script>
 
+<script src="header.js"></script>
 </body>
 </html>

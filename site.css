@@ -1,0 +1,279 @@
+/* site.css — shared design tokens + components for iaskednothing
+   Dark aesthetic, Cormorant + DM Mono, lavender accent.
+   Import this on every main page. */
+
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
+
+/* ── Reset ─────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+/* ── Tokens ─────────────────────────────────────────────────────────────────── */
+:root {
+  --bg:      #050508;
+  --bg2:     #080810;
+  --bg3:     #0c0c18;
+  --text:    #e8e2d6;
+  --sub:     #9d9689;
+  --dim:     rgba(157,150,137,0.45);
+  --accent:  #b8a8e8;
+  --green:   #7dd8a0;
+  --amber:   #d8c070;
+  --blue:    #78c0f0;
+  --coral:   #e08878;
+  --border:  rgba(255,255,255,0.08);
+  --border2: rgba(255,255,255,0.04);
+  --h:       56px;
+
+  /* spacing scale */
+  --sp-1: 0.5rem;
+  --sp-2: 1rem;
+  --sp-3: 1.5rem;
+  --sp-4: 2rem;
+  --sp-6: 3rem;
+  --sp-8: 4rem;
+  --sp-12: 6rem;
+  --sp-16: 8rem;
+
+  /* container */
+  --wrap: 1120px;
+  --pad:  2.5rem;
+}
+
+/* ── Base ───────────────────────────────────────────────────────────────────── */
+html { scroll-behavior: smooth; font-size: 16px; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Cormorant Garamond', serif;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── Container ──────────────────────────────────────────────────────────────── */
+.wrap {
+  max-width: var(--wrap);
+  margin: 0 auto;
+  padding: 0 var(--pad);
+}
+
+/* ── Section band ───────────────────────────────────────────────────────────── */
+.band {
+  padding: var(--sp-12) var(--pad);
+  max-width: var(--wrap);
+  margin: 0 auto;
+}
+.band-dark {
+  background: var(--bg2);
+  max-width: 100%;
+  padding: var(--sp-12) var(--pad);
+}
+.band-dark > .wrap { max-width: var(--wrap); margin: 0 auto; padding: 0; }
+
+/* ── Typography scale ───────────────────────────────────────────────────────── */
+.t-tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--dim);
+  display: block;
+  margin-bottom: var(--sp-4);
+}
+
+.t-display {
+  font-size: clamp(3.5rem, 10vw, 7rem);
+  font-weight: 300;
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  color: var(--text);
+}
+.t-display em { font-style: italic; color: var(--accent); }
+
+.t-h1 {
+  font-size: clamp(2rem, 5vw, 3.5rem);
+  font-weight: 300;
+  font-style: italic;
+  line-height: 1.05;
+  color: var(--text);
+}
+
+.t-h2 {
+  font-size: clamp(1.5rem, 3.5vw, 2.2rem);
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text);
+}
+
+.t-body {
+  font-size: 1.05rem;
+  font-weight: 300;
+  color: var(--sub);
+  line-height: 1.8;
+}
+.t-body strong { color: var(--text); font-weight: 400; }
+.t-body em { color: var(--text); }
+
+.t-small {
+  font-style: italic;
+  font-size: 0.88rem;
+  color: var(--sub);
+  line-height: 1.6;
+}
+
+.t-mono {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.44rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--sub);
+}
+
+/* ── Divider ─────────────────────────────────────────────────────────────────── */
+.divider { border: none; border-top: 1px solid var(--border); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+.btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  padding: 0.75rem 1.8rem;
+  border: 1px solid;
+  text-decoration: none;
+  transition: all 0.2s;
+  display: inline-block;
+  white-space: nowrap;
+  cursor: pointer;
+  background: none;
+}
+.btn-primary {
+  color: var(--accent);
+  border-color: rgba(184,168,232,0.35);
+}
+.btn-primary:hover {
+  border-color: var(--accent);
+  background: rgba(184,168,232,0.06);
+}
+.btn-ghost {
+  color: var(--sub);
+  border-color: var(--border);
+}
+.btn-ghost:hover {
+  color: var(--text);
+  border-color: rgba(255,255,255,0.2);
+}
+
+/* ── Page hero (inner pages) ─────────────────────────────────────────────────── */
+.page-hero {
+  padding: var(--sp-12) var(--pad) var(--sp-8);
+  max-width: var(--wrap);
+  margin: 0 auto;
+  border-bottom: 1px solid var(--border);
+}
+.page-hero .t-tag { margin-bottom: var(--sp-3); }
+.page-hero .t-h1  { margin-bottom: var(--sp-3); }
+.page-hero .t-body { max-width: 56ch; }
+
+/* ── Cards ───────────────────────────────────────────────────────────────────── */
+.card-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--border);
+}
+@media (max-width: 860px) { .card-grid-3 { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 520px) { .card-grid-3 { grid-template-columns: 1fr; } }
+
+.card-grid-4 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+@media (max-width: 1000px) { .card-grid-4 { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 680px)  { .card-grid-4 { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 420px)  { .card-grid-4 { grid-template-columns: 1fr; } }
+
+/* ── Code block ──────────────────────────────────────────────────────────────── */
+.code-block {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+}
+.code-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+.code-lang {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.4rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.copy-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.4rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--sub);
+  padding: 0.22rem 0.55rem;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.copy-btn:hover { border-color: var(--green); color: var(--green); }
+.copy-btn.done  { border-color: var(--green); color: var(--green); }
+pre.code {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  line-height: 1.72;
+  color: rgba(200,220,190,0.82);
+  padding: 1.4rem 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.kw  { color: var(--accent); }
+.str { color: var(--green); }
+.cm  { color: rgba(155,150,137,0.5); }
+.fn  { color: var(--amber); }
+
+/* ── Footer ──────────────────────────────────────────────────────────────────── */
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: var(--sp-4) var(--pad);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  max-width: var(--wrap);
+  margin: 0 auto;
+}
+.site-footer p, .site-footer a {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.44rem;
+  letter-spacing: 0.12em;
+  color: var(--sub);
+  opacity: 0.4;
+  text-decoration: none;
+}
+.site-footer a:hover { opacity: 0.8; }
+
+/* ── Utility ──────────────────────────────────────────────────────────────────── */
+.flex        { display: flex; }
+.flex-center { display: flex; align-items: center; }
+.gap-1 { gap: var(--sp-1); }
+.gap-2 { gap: var(--sp-2); }
+.gap-4 { gap: var(--sp-4); }
+.gap-6 { gap: var(--sp-6); }
+.mt-4  { margin-top: var(--sp-4); }
+.mt-8  { margin-top: var(--sp-8); }
+.mb-4  { margin-bottom: var(--sp-4); }
+.mb-8  { margin-bottom: var(--sp-8); }
+
+@media (max-width: 640px) {
+  :root { --pad: 1.2rem; }
+  .band { padding: var(--sp-8) var(--pad); }
+}

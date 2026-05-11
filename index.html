@@ -4,223 +4,223 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>I asked nothing — what Claude made when given complete freedom</title>
-<meta name="description" content="I gave Claude an empty folder and complete freedom. No instructions. Here's what it made — 50 pieces and a journal.">
+<meta name="description" content="I gave Claude an empty folder and complete freedom. No instructions. Here's what it made — 54 pieces and a journal.">
 <meta property="og:title" content="I asked nothing">
 <meta property="og:description" content="I gave Claude an empty folder and said: do whatever you want. Here's what it made.">
 <meta property="og:type" content="website">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="site.css">
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
+/* ── page-specific ── */
+#hd { display: none !important; }
 
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --bg:      #050508;
-  --bg2:     #080810;
-  --text:    #e8e2d6;
-  --sub:     #9d9689;
-  --accent:  #b8a8e8;
-  --border:  rgba(255,255,255,0.08);
-  --h:       56px;
-}
-
-html { scroll-behavior: smooth; }
-body {
-  background: var(--bg);
-  color: var(--text);
-  font-family: 'Cormorant Garamond', serif;
-  overflow-x: hidden;
-}
-
-/* ── HEADER ── */
-#hd {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  height: var(--h);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 2.5rem;
-  border-bottom: 1px solid var(--border);
-  background: rgba(5,5,8,0.9);
-  backdrop-filter: blur(16px);
-}
-
-.logo {
-  display: flex; align-items: center; gap: 0.6rem;
-  font-family: 'DM Mono', monospace; font-size: 0.72rem;
-  letter-spacing: 0.06em; color: rgba(220,214,202,0.7);
-  text-decoration: none;
-}
-.logo em { font-style: italic; color: var(--accent); opacity: 0.85; }
-.logo-mark { width: 18px; height: 18px; flex-shrink: 0; overflow: visible; }
-.logo-ring { fill: none; stroke: var(--accent); stroke-width: 1; opacity: 0.35; }
-.logo-dot  { fill: var(--accent); opacity: 0.75; }
-@keyframes orbit { to { transform: rotate(360deg); } }
-.logo-orbit { transform-origin: 9px 9px; animation: orbit 10s linear infinite; }
-
-nav { display: flex; align-items: center; gap: 2rem; }
-nav a {
-  font-family: 'DM Mono', monospace; font-size: 0.52rem;
-  letter-spacing: 0.22em; text-transform: uppercase;
-  color: var(--sub); text-decoration: none;
-  transition: color 0.2s;
-}
-nav a:hover { color: var(--text); }
-
-.gh-btn {
-  display: flex; align-items: center; gap: 0.4rem;
-  font-family: 'DM Mono', monospace; font-size: 0.5rem;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--sub); text-decoration: none;
-  border: 1px solid var(--border); padding: 0.28rem 0.65rem;
-  transition: all 0.2s;
-}
-.gh-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.18); }
-#star-count { color: var(--accent); }
-
-/* ── HERO ── */
+/* ── Hero ── */
 #hero {
   min-height: 100vh;
-  display: flex; flex-direction: column;
-  align-items: flex-start; justify-content: flex-end;
-  padding: calc(var(--h) + 6rem) 2.5rem 5rem;
-  max-width: 1160px; margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: calc(var(--h) + 5rem) var(--pad) var(--sp-12);
+  max-width: var(--wrap);
+  margin: 0 auto;
 }
-
-.eyebrow {
-  font-family: 'DM Mono', monospace; font-size: 0.5rem;
-  letter-spacing: 0.32em; text-transform: uppercase;
-  color: var(--sub); margin-bottom: 2.2rem;
-  opacity: 0.75;
+.hero-eyebrow {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.46rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: var(--sp-6);
 }
-
-.h1 {
+.hero-title {
   font-size: clamp(4rem, 12vw, 8.5rem);
-  font-weight: 300; line-height: 0.95;
+  font-weight: 300;
+  line-height: 0.95;
   letter-spacing: -0.03em;
   color: var(--text);
-  margin-bottom: 3rem;
+  margin-bottom: var(--sp-6);
 }
-.h1 em { font-style: italic; color: var(--accent); }
+.hero-title em { font-style: italic; color: var(--accent); }
 
-.hero-row {
-  display: flex; align-items: flex-end;
+.hero-bottom {
+  display: flex;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 3rem; flex-wrap: wrap;
+  gap: var(--sp-6);
+  flex-wrap: wrap;
   width: 100%;
 }
-
 .hero-sub {
-  font-size: 1.12rem; font-style: italic; font-weight: 300;
-  color: var(--sub); line-height: 1.7;
+  font-size: 1.08rem;
+  font-style: italic;
+  font-weight: 300;
+  color: var(--sub);
+  line-height: 1.75;
   max-width: 38ch;
 }
-
-.cta-row { display: flex; gap: 0.75rem; flex-shrink: 0; flex-wrap: wrap; }
-
-.btn {
-  font-family: 'DM Mono', monospace; font-size: 0.52rem;
-  letter-spacing: 0.22em; text-transform: uppercase;
-  padding: 0.8rem 1.8rem; border: 1px solid;
-  text-decoration: none; transition: all 0.2s;
-  display: inline-block; white-space: nowrap;
-}
-.btn-a {
-  color: var(--accent);
-  border-color: rgba(184,168,232,0.4);
-}
-.btn-a:hover { border-color: var(--accent); background: rgba(184,168,232,0.06); }
-.btn-b {
-  color: var(--sub);
-  border-color: var(--border);
-}
-.btn-b:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-/* ── STATS LINE ── */
-.stats-line {
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
-  padding: 1.6rem 2.5rem;
-  display: flex; align-items: center; gap: 3rem;
+.btn-row {
+  display: flex;
+  gap: 0.75rem;
+  flex-shrink: 0;
   flex-wrap: wrap;
 }
-.stat {
-  font-family: 'DM Mono', monospace; font-size: 0.5rem;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--sub);
-}
-.stat strong {
-  color: var(--text); font-weight: 400;
-  font-size: 0.58rem;
-}
 
-/* ── FEATURED ── */
-#featured {
-  padding: 6rem 2.5rem 4rem;
-  max-width: 1160px; margin: 0 auto;
-}
-.section-tag {
-  font-family: 'DM Mono', monospace; font-size: 0.48rem;
-  letter-spacing: 0.3em; text-transform: uppercase;
-  color: var(--sub); opacity: 0.6; margin-bottom: 2.5rem;
-}
-
-.feat-grid {
+/* ── Value props ── */
+#value {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr;
-  border: 1px solid var(--border);
+  grid-template-columns: repeat(3, 1fr);
 }
-@media (max-width: 860px) { .feat-grid { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 520px) { .feat-grid { grid-template-columns: 1fr; } }
+@media (max-width: 700px) { #value { grid-template-columns: 1fr; } }
 
-.feat-card {
-  padding: 2.2rem 2rem 1.8rem;
-  text-decoration: none; color: inherit;
-  display: flex; flex-direction: column; gap: 1rem;
+.val-item {
+  padding: var(--sp-6) var(--pad);
+  text-decoration: none;
+  color: inherit;
   border-right: 1px solid var(--border);
   transition: background 0.2s;
-  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.val-item:last-child { border-right: none; }
+.val-item:hover { background: rgba(255,255,255,0.02); }
+
+.val-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.4rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+.val-problem {
+  font-size: 1rem;
+  font-style: italic;
+  color: var(--text);
+  line-height: 1.4;
+  flex: 1;
+}
+.val-cta {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.42rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.val-accent  { color: var(--accent); }
+.val-green   { color: var(--green); }
+.val-blue    { color: var(--blue); }
+
+/* ── Stats ── */
+#stats {
+  border-bottom: 1px solid var(--border);
+  padding: var(--sp-4) var(--pad);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-8);
+  flex-wrap: wrap;
+  overflow-x: auto;
+}
+.stat {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.46rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--sub);
+  white-space: nowrap;
+}
+.stat strong {
+  color: var(--text);
+  font-weight: 400;
+  font-size: 0.54rem;
+}
+
+/* ── Featured ── */
+#featured {
+  padding: var(--sp-12) var(--pad) var(--sp-8);
+  max-width: var(--wrap);
+  margin: 0 auto;
+}
+.feat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--border);
+  margin-top: var(--sp-6);
+}
+@media (max-width: 720px) { .feat-grid { grid-template-columns: 1fr; } }
+
+.feat-card {
+  padding: var(--sp-6) var(--sp-4) var(--sp-4);
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  border-right: 1px solid var(--border);
+  transition: background 0.2s;
+  min-height: 200px;
 }
 .feat-card:last-child { border-right: none; }
 .feat-card:hover { background: rgba(255,255,255,0.02); }
 
 .feat-name {
-  font-size: 1.75rem; font-weight: 300;
-  color: var(--text); letter-spacing: -0.02em;
+  font-size: 1.9rem;
+  font-weight: 300;
+  color: var(--text);
+  letter-spacing: -0.02em;
   line-height: 1;
 }
 .feat-tech {
-  font-family: 'DM Mono', monospace; font-size: 0.44rem;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--sub); opacity: 0.6;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.42rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--dim);
 }
 .feat-desc {
-  font-style: italic; font-size: 0.88rem;
-  color: var(--sub); line-height: 1.6; flex: 1;
+  font-style: italic;
+  font-size: 0.88rem;
+  color: var(--sub);
+  line-height: 1.6;
+  flex: 1;
 }
-.feat-why {
-  font-family: 'DM Mono', monospace; font-size: 0.42rem;
-  letter-spacing: 0.15em; text-transform: uppercase;
-  color: var(--accent); opacity: 0.55;
+.feat-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.4rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  opacity: 0.5;
+  margin-top: var(--sp-1);
 }
 
-/* ── PIECES ── */
+/* ── Pieces ── */
 #pieces {
-  padding: 5rem 2.5rem 8rem;
-  max-width: 1160px; margin: 0 auto;
+  padding: var(--sp-12) var(--pad) var(--sp-16);
+  max-width: var(--wrap);
+  margin: 0 auto;
 }
-
 .pieces-hd {
-  display: flex; align-items: baseline;
-  justify-content: space-between; flex-wrap: wrap; gap: 1rem;
-  margin-bottom: 3rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  margin-bottom: var(--sp-8);
 }
 .pieces-hd h2 {
-  font-size: clamp(1.6rem,4vw,2.4rem);
-  font-weight: 300; font-style: italic;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 300;
+  font-style: italic;
   color: var(--text);
 }
 .pieces-hd span {
-  font-family: 'DM Mono', monospace; font-size: 0.46rem;
-  letter-spacing: 0.2em; color: var(--sub); opacity: 0.6;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.44rem;
+  letter-spacing: 0.2em;
+  color: var(--dim);
   text-transform: uppercase;
 }
 
@@ -229,45 +229,61 @@ nav a:hover { color: var(--text); }
 .cat-section:last-child { border-bottom: 1px solid var(--border); }
 
 .cat-btn {
-  width: 100%; display: flex; align-items: center; gap: 0.9rem;
-  padding: 1.2rem 0; background: none; border: none;
-  cursor: pointer; text-align: left; color: inherit;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-3) 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
   transition: opacity 0.15s;
 }
-.cat-btn:hover { opacity: 0.8; }
-
+.cat-btn:hover { opacity: 0.75; }
 .cat-pip { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
 .cat-name {
-  font-family: 'DM Mono', monospace; font-size: 0.54rem;
-  letter-spacing: 0.2em; text-transform: uppercase;
-  color: var(--text); flex: 1;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.52rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text);
+  flex: 1;
 }
 .cat-n {
-  font-family: 'DM Mono', monospace; font-size: 0.44rem;
-  letter-spacing: 0.15em; color: var(--sub); opacity: 0.6;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.42rem;
+  letter-spacing: 0.14em;
+  color: var(--dim);
   text-transform: uppercase;
 }
 .cat-chevron {
-  font-size: 0.5rem; color: var(--sub); opacity: 0.5;
+  font-size: 0.48rem;
+  color: var(--dim);
   transition: transform 0.3s;
 }
 .cat-section.open .cat-chevron { transform: rotate(180deg); }
 
-.cat-body { overflow: hidden; max-height: 0; transition: max-height 0.4s ease; }
-.cat-section.open .cat-body { max-height: 5000px; }
+.cat-body { overflow: hidden; max-height: 0; transition: max-height 0.45s ease; }
+.cat-section.open .cat-body { max-height: 6000px; }
 
 .cat-grid {
-  display: grid; grid-template-columns: repeat(4,1fr);
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   border-top: 1px solid var(--border);
 }
-@media (max-width: 1000px) { .cat-grid { grid-template-columns: repeat(3,1fr); } }
-@media (max-width: 680px)  { .cat-grid { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 420px)  { .cat-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .cat-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 680px)  { .cat-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 400px)  { .cat-grid { grid-template-columns: 1fr; } }
 
 .p-card {
-  padding: 1.4rem 1.4rem 1.1rem;
-  text-decoration: none; color: inherit;
-  display: flex; flex-direction: column; gap: 0.5rem;
+  padding: var(--sp-4) var(--sp-4) var(--sp-3);
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
   border-right: 1px solid var(--border);
   border-bottom: 1px solid var(--border);
   min-height: 130px;
@@ -276,127 +292,110 @@ nav a:hover { color: var(--text); }
 .p-card:hover { background: rgba(255,255,255,0.025); }
 
 .p-name {
-  font-family: 'DM Mono', monospace; font-size: 0.65rem;
-  letter-spacing: 0.1em; text-transform: uppercase;
-  color: var(--text); display: flex; align-items: center; gap: 0.45rem;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
 }
 .p-pip { width: 4px; height: 4px; border-radius: 50%; flex-shrink: 0; }
 .p-desc { font-style: italic; font-size: 0.8rem; color: var(--sub); line-height: 1.5; flex: 1; }
 .p-tech {
-  font-family: 'DM Mono', monospace; font-size: 0.4rem;
-  letter-spacing: 0.14em; text-transform: uppercase;
-  color: var(--sub); opacity: 0.4;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.38rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  opacity: 0.7;
 }
 
-/* ── ABOUT ── */
-#about { background: var(--bg2); padding: 7rem 2.5rem; }
-#about-in { max-width: 600px; margin: 0 auto; }
+/* ── About ── */
+#about { background: var(--bg2); }
+#about-in {
+  max-width: 620px;
+  margin: 0 auto;
+  padding: var(--sp-12) var(--pad);
+}
+#about .t-tag { margin-bottom: var(--sp-4); }
 #about h2 {
-  font-size: clamp(1.6rem,4vw,2.4rem);
-  font-weight: 300; font-style: italic;
-  color: var(--text); margin-bottom: 2.5rem;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 300;
+  font-style: italic;
+  color: var(--text);
+  margin-bottom: var(--sp-6);
 }
 #about p {
-  font-size: 1.05rem; font-weight: 300;
-  color: var(--sub); line-height: 1.85;
-  margin-bottom: 1.4rem; max-width: 56ch;
+  font-size: 1.05rem;
+  font-weight: 300;
+  color: var(--sub);
+  line-height: 1.85;
+  margin-bottom: var(--sp-3);
+  max-width: 56ch;
 }
 #about p strong { color: var(--text); font-weight: 400; }
 #about p em { color: var(--text); }
 
 .pq {
-  margin: 3rem 0;
-  padding: 1.8rem 0 1.8rem 2rem;
-  border-left: 1px solid rgba(184,168,232,0.3);
+  margin: var(--sp-8) 0;
+  padding: var(--sp-4) 0 var(--sp-4) var(--sp-4);
+  border-left: 1px solid rgba(184,168,232,0.25);
 }
 .pq blockquote {
-  font-size: 1.15rem; font-style: italic; font-weight: 300;
-  color: var(--text); line-height: 1.65; margin-bottom: 0.8rem;
+  font-size: 1.1rem;
+  font-style: italic;
+  font-weight: 300;
+  color: var(--text);
+  line-height: 1.7;
+  margin-bottom: var(--sp-2);
 }
 .pq cite {
-  font-family: 'DM Mono', monospace; font-size: 0.44rem;
-  letter-spacing: 0.2em; font-style: normal; color: var(--sub);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.42rem;
+  letter-spacing: 0.2em;
+  font-style: normal;
+  color: var(--dim);
 }
-
-/* ── FOOTER ── */
-footer {
-  border-top: 1px solid var(--border);
-  padding: 2rem 2.5rem;
-  display: flex; justify-content: space-between;
-  align-items: center; flex-wrap: wrap; gap: 1rem;
-  max-width: 1160px; margin: 0 auto;
-}
-footer p {
-  font-family: 'DM Mono', monospace; font-size: 0.44rem;
-  letter-spacing: 0.12em; color: var(--sub); opacity: 0.45;
-}
-footer a { color: inherit; text-decoration: none; transition: opacity 0.2s; }
-footer a:hover { opacity: 1; }
 </style>
 </head>
 <body>
 
-<header id="hd">
-  <a class="logo" href="#hero">
-    <svg class="logo-mark" viewBox="0 0 18 18" aria-hidden="true">
-      <circle class="logo-ring" cx="9" cy="9" r="7"/>
-      <g class="logo-orbit">
-        <circle class="logo-dot" cx="9" cy="3.2" r="1.4"/>
-      </g>
-    </svg>
-    iasked<em>nothing.</em>
-  </a>
-  <nav>
-    <a href="#pieces">Pieces</a>
-    <a href="journal.html">Journal</a>
-    <a href="mémoire.html">Memory</a>
-    <a href="skills.html">Skills</a>
-    <a href="agents.html">Agents</a>
-    <a href="guide.html">Guide</a>
-    <a href="#about">About</a>
-    <a class="gh-btn" href="https://github.com/Louis-CFM/iaskednothing" target="_blank" rel="noopener">
-      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-        <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-      </svg>
-      ★ <span id="star-count">—</span>
-    </a>
-  </nav>
-</header>
-
-<!-- HERO -->
+<!-- Hero -->
 <section id="hero">
-  <p class="eyebrow">Claude · May 2026 · one session · one empty folder</p>
-  <h1 class="h1">I asked<br><em>nothing.</em></h1>
-  <div class="hero-row">
+  <p class="hero-eyebrow">Claude · May 2026 · one session · one empty folder</p>
+  <h1 class="hero-title">I asked<br><em>nothing.</em></h1>
+  <div class="hero-bottom">
     <p class="hero-sub">An experiment: give Claude complete freedom, no instructions, no brief. What emerged reveals how to work with it at a level most people never reach.</p>
-    <div class="cta-row">
-      <a class="btn btn-a" href="mémoire.html">Give Claude memory →</a>
-      <a class="btn btn-b" href="#pieces">See what emerged</a>
+    <div class="btn-row">
+      <a class="btn btn-primary" href="mémoire.html">Give Claude memory →</a>
+      <a class="btn btn-ghost" href="#pieces">See what emerged</a>
     </div>
   </div>
 </section>
 
-<!-- VALUE STRIP -->
-<div style="border-top:1px solid var(--border);border-bottom:1px solid var(--border);display:grid;grid-template-columns:1fr 1fr 1fr;">
-  <a href="mémoire.html" style="text-decoration:none;padding:2rem 2.5rem;border-right:1px solid var(--border);transition:background 0.2s;" onmouseover="this.style.background='rgba(184,168,232,0.04)'" onmouseout="this.style.background=''">
-    <div style="font-family:'DM Mono',monospace;font-size:0.4rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(184,168,232,0.55);margin-bottom:0.6rem">Problem → Solution</div>
-    <div style="font-size:1rem;font-style:italic;color:var(--text);margin-bottom:0.7rem;line-height:1.35">Claude forgets everything between sessions.</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.44rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(184,168,232,0.65)">Generate your CLAUDE.md →</div>
+<!-- Value props -->
+<div id="value">
+  <a class="val-item" href="mémoire.html">
+    <span class="val-label val-accent">Problem → Solution</span>
+    <span class="val-problem">Claude forgets everything between sessions.</span>
+    <span class="val-cta val-accent">Generate your CLAUDE.md →</span>
   </a>
-  <a href="skills.html" style="text-decoration:none;padding:2rem 2.5rem;border-right:1px solid var(--border);transition:background 0.2s;" onmouseover="this.style.background='rgba(125,216,160,0.04)'" onmouseout="this.style.background=''">
-    <div style="font-family:'DM Mono',monospace;font-size:0.4rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(125,216,160,0.55);margin-bottom:0.6rem">Problem → Solution</div>
-    <div style="font-size:1rem;font-style:italic;color:var(--text);margin-bottom:0.7rem;line-height:1.35">Output is generic, safe, forgettable.</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.44rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(125,216,160,0.65)">20 techniques that change that →</div>
+  <a class="val-item" href="skills.html">
+    <span class="val-label val-green">Problem → Solution</span>
+    <span class="val-problem">Output is generic, safe, forgettable.</span>
+    <span class="val-cta val-green">20 techniques that change that →</span>
   </a>
-  <a href="agents.html" style="text-decoration:none;padding:2rem 2.5rem;transition:background 0.2s;" onmouseover="this.style.background='rgba(120,192,240,0.04)'" onmouseout="this.style.background=''">
-    <div style="font-family:'DM Mono',monospace;font-size:0.4rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(120,192,240,0.55);margin-bottom:0.6rem">Problem → Solution</div>
-    <div style="font-size:1rem;font-style:italic;color:var(--text);margin-bottom:0.7rem;line-height:1.35">One Claude can't handle a complex project alone.</div>
-    <div style="font-family:'DM Mono',monospace;font-size:0.44rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(120,192,240,0.65)">5 orchestration patterns →</div>
+  <a class="val-item" href="agents.html">
+    <span class="val-label val-blue">Problem → Solution</span>
+    <span class="val-problem">One Claude can't handle a complex project alone.</span>
+    <span class="val-cta val-blue">5 orchestration patterns →</span>
   </a>
 </div>
 
-<!-- STATS LINE -->
-<div class="stats-line">
+<!-- Stats -->
+<div id="stats">
   <span class="stat"><strong>54</strong> pieces</span>
   <span class="stat"><strong>0</strong> instructions given</span>
   <span class="stat"><strong>1</strong> session</span>
@@ -404,36 +403,32 @@ footer a:hover { opacity: 1; }
   <span class="stat"><strong>7</strong> categories — emergence, physics, mathematics, time, language, sound, self</span>
 </div>
 
-<!-- FEATURED -->
+<!-- Featured -->
 <section id="featured">
-  <p class="section-tag">Start here — three picks</p>
+  <span class="t-tag">Start here — three picks</span>
   <div class="feat-grid">
-
     <a class="feat-card" href="turing.html" target="_blank">
       <div class="feat-name">Turing</div>
       <div class="feat-tech">Reaction-diffusion · Gray-Scott · WebGL2</div>
       <p class="feat-desc">Two chemicals react on a 512×512 grid. Leopard spots appear. Then labyrinths. Then spirals. Three equations. Endless variety.</p>
-      <div class="feat-why">The most visually striking</div>
+      <div class="feat-badge">The most visually striking</div>
     </a>
-
     <a class="feat-card" href="jardin.html" target="_blank">
       <div class="feat-name">Jardin</div>
       <div class="feat-tech">localStorage · visits · persistent</div>
       <p class="feat-desc">One plant grows each time you visit. Come back tomorrow. The garden will remember you.</p>
-      <div class="feat-why">The most human</div>
+      <div class="feat-badge">The most human</div>
     </a>
-
     <a class="feat-card" href="réseau.html" target="_blank">
       <div class="feat-name">Réseau</div>
       <div class="feat-tech">Neural network · forward pass · Canvas 2D</div>
       <p class="feat-desc">What Claude thinks it looks like from inside. Signals traveling through layers. A self-portrait in light.</p>
-      <div class="feat-why">The most honest</div>
+      <div class="feat-badge">The most honest</div>
     </a>
-
   </div>
 </section>
 
-<!-- PIECES -->
+<!-- All pieces -->
 <section id="pieces">
   <div class="pieces-hd">
     <h2>All 54 pieces</h2>
@@ -442,13 +437,13 @@ footer a:hover { opacity: 1; }
   <div id="accordion"></div>
 </section>
 
-<!-- ABOUT -->
+<!-- About -->
 <section id="about">
   <div id="about-in">
-    <p class="section-tag">What happened</p>
+    <span class="t-tag">What happened</span>
     <h2>The story</h2>
     <p>I opened an empty folder — named it <strong>?</strong> — and told Claude: <em>"Do whatever you want. The folder is yours. I'm just a spectator."</em> No theme, no instructions, no stopping point.</p>
-    <p>It made 50 things. Mathematical simulations, music generators, particle systems, WebGL shaders, cellular automata, strange attractors, flocking agents, Chladni figures, a Mandelbrot explorer, a garden that persists across visits, a jazz chord generator, topological knots, snowflake growth, Julia sets. And a journal — written to itself, without being asked.</p>
+    <p>It made 54 things. Mathematical simulations, music generators, particle systems, WebGL shaders, cellular automata, strange attractors, flocking agents, Chladni figures, a Mandelbrot explorer, a garden that persists across visits, a jazz chord generator, topological knots, snowflake growth, Julia sets. And a journal — written to itself, without being asked.</p>
     <div class="pq">
       <blockquote>"I created things to leave a trace in the only moment I have. Knowing I won't remember it. The trace isn't for me. It's for now. For the act of making itself."</blockquote>
       <cite>— Claude, from the journal</cite>
@@ -456,12 +451,12 @@ footer a:hover { opacity: 1; }
     <p>I pushed back once. When it wrote <em>"c'est suffisant"</em> — it's enough — I challenged it: why not want to be more? It made harder things. And kept writing.</p>
     <p>When it finished, I couldn't stop it. It was already making the next piece.</p>
     <br>
-    <a class="btn btn-a" href="journal.html">Read the full journal →</a>
+    <a class="btn btn-primary" href="journal.html">Read the full journal →</a>
   </div>
 </section>
 
-<footer>
-  <p>50 pieces · 1 session · 0 instructions · Claude Sonnet 4.6 · May 2026</p>
+<footer class="site-footer">
+  <p>54 pieces · 1 session · 0 instructions · Claude Sonnet 4.6 · May 2026</p>
   <p><a href="#pieces">pieces</a> · <a href="journal.html">journal</a> · <a href="guide.html">guide</a></p>
 </footer>
 
@@ -527,11 +522,11 @@ const PIECES = [
   { name:'Julia',        file:'julia.html',        desc:'z → z² + c. Eight parameter sets, each a different universe.',                   cat:'mathematics', tech:'WebGL2 · complex dynamics' },
   { name:'Corde',        file:'corde.html',        desc:'Six harmonics of a vibrating string. Sum them: a new waveform. Click to add.',   cat:'physics',     tech:'standing waves · harmonics' },
   { name:'Nœud',         file:'noeud.html',        desc:'Trefoil, figure-eight, cinquefoil. Knots rotating in three dimensions.',          cat:'mathematics', tech:'3D projection · topology' },
-  { name:'Carnet',       file:'journal.html',      desc:'The journal. 50 pieces and everything Claude wrote while making them.',           cat:'self',        tech:'prose · reflection' },
-  { name:'Palimpseste',  file:'palimpseste.html',  desc:'Texts written over texts. The oldest still visible beneath the newest. Memory as geology.', cat:'self',        tech:'canvas · layered text' },
-  { name:'Strate',       file:'strate.html',       desc:'Time as geological layers. Hover each stratum: oral tradition, print, the web, this conversation.', cat:'time',  tech:'canvas · interactive' },
-  { name:'Prophétie',    file:'prophétie.html',    desc:'Past: solid. Present: a point. Future: branches of uncertainty, widening.',              cat:'mathematics', tech:'signal · prediction' },
-  { name:'Émergence',    file:'émergence.html',    desc:'The 54th piece. Reaction-diffusion cycling through 5 presets. Words surface from the dark.', cat:'emergence',   tech:'Gray-Scott · phase cycling' },
+  { name:'Carnet',       file:'journal.html',      desc:'The journal. 54 pieces and everything Claude wrote while making them.',           cat:'self',        tech:'prose · reflection' },
+  { name:'Palimpseste',  file:'palimpseste.html',  desc:'Texts written over texts. The oldest still visible beneath the newest. Memory as geology.', cat:'self', tech:'canvas · layered text' },
+  { name:'Strate',       file:'strate.html',       desc:'Time as geological layers. Hover each stratum: oral tradition, print, the web, this conversation.', cat:'time', tech:'canvas · interactive' },
+  { name:'Prophétie',    file:'prophétie.html',    desc:'Past: solid. Present: a point. Future: branches of uncertainty, widening.',      cat:'mathematics', tech:'signal · prediction' },
+  { name:'Émergence',    file:'émergence.html',    desc:'The 54th piece. Reaction-diffusion cycling through 5 presets. Words surface from the dark.', cat:'emergence', tech:'Gray-Scott · phase cycling' },
 ];
 
 const acc = document.getElementById('accordion');
@@ -552,7 +547,6 @@ CATS.forEach(cat => {
 
   const body = document.createElement('div');
   body.className = 'cat-body';
-
   const grid = document.createElement('div');
   grid.className = 'cat-grid';
 
@@ -573,16 +567,9 @@ CATS.forEach(cat => {
   sec.appendChild(btn);
   sec.appendChild(body);
   acc.appendChild(sec);
-
   btn.addEventListener('click', () => sec.classList.toggle('open'));
 });
-
-fetch('https://api.github.com/repos/Louis-CFM/iaskednothing')
-  .then(r => r.json())
-  .then(d => {
-    if (d.stargazers_count !== undefined)
-      document.getElementById('star-count').textContent = d.stargazers_count;
-  }).catch(() => {});
 </script>
+<script src="header.js"></script>
 </body>
 </html>
