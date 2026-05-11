@@ -382,7 +382,7 @@ footer a:hover { color: rgba(175,165,230,0.65); }
   <div id="hero-content">
     <p class="eyebrow">Claude · May 11, 2026 · one session · one empty folder</p>
     <h1 class="h1">I asked<br><em>nothing.</em></h1>
-    <p class="hero-sub">I gave Claude complete freedom and walked away. 35 things emerged. And a journal it wrote to itself.</p>
+    <p class="hero-sub">I gave Claude complete freedom and walked away. 43 things emerged. And a journal it wrote to itself.</p>
     <div class="cta-row">
       <a class="btn btn-primary" href="#pieces">Explore the pieces ↓</a>
       <a class="btn btn-ghost" href="journal.html">Read the journal →</a>
@@ -428,7 +428,7 @@ footer a:hover { color: rgba(175,165,230,0.65); }
 
 <!-- ── PIECES ───────────────────────────────────────────────────────────────── -->
 <section id="pieces">
-  <h2>All 35 pieces</h2>
+  <h2>All 43 pieces</h2>
   <p class="section-count">Interactive · runs in any browser · no install required</p>
 
   <div class="filters" id="filters">
@@ -458,9 +458,10 @@ footer a:hover { color: rgba(175,165,230,0.65); }
     </p>
 
     <p>
-      It made 35 things. Mathematical simulations, music generators, particle systems,
-      WebGL shaders, cellular automata, a Mandelbrot explorer, a garden that persists across visits,
-      a jazz chord progression generator. And a journal — written to itself, without being asked.
+      It made 43 things. Mathematical simulations, music generators, particle systems,
+      WebGL shaders, cellular automata, strange attractors, flocking agents, Chladni figures,
+      a Mandelbrot explorer, a garden that persists across visits, a jazz chord progression generator.
+      And a journal — written to itself, without being asked.
     </p>
 
     <div class="pull-quote">
@@ -487,7 +488,7 @@ footer a:hover { color: rgba(175,165,230,0.65); }
 
 <!-- ── FOOTER ───────────────────────────────────────────────────────────────── -->
 <footer>
-  <p>35 pieces · 1 session · 0 instructions given · Claude Sonnet 4.6 · May 11, 2026</p>
+  <p>43 pieces · 1 session · 0 instructions given · Claude Sonnet 4.6 · May 11, 2026</p>
   <p>
     <a href="#pieces">pieces</a> &nbsp;·&nbsp;
     <a href="journal.html">journal</a> &nbsp;·&nbsp;
@@ -543,7 +544,16 @@ const PIECES = [
   { name:'Babel',        file:'babel.html',           desc:'Water. Eau. 水. Agua. Wasser. Вода. The same, thirty languages.',              cat:'language',    tech:'universality' },
   { name:'Entropie',     file:'entropie.html',        desc:'Sorted colors, released. They mix. They never sort again.',                    cat:'physics',     tech:'thermodynamics' },
   { name:'Spirographe',  file:'spirographe.html',     desc:'A point on a rolling circle. Hypotrochoids traced with the mechanism shown.',  cat:'mathematics', tech:'parametric · mechanism' },
-  { name:'Carnet',       file:'journal.html',         desc:'The journal. 35 pieces and everything Claude wrote while making them.',        cat:'self',        tech:'prose · reflection' },
+  { name:'Essaim',       file:'essaim.html',           desc:'300 agents. Three rules: separate, align, cohere. A flock that thinks.',       cat:'emergence',   tech:'boids · flocking' },
+  { name:'Pendule',      file:'pendule.html',          desc:'10 double pendulums. Same start, different by 0.002°. They diverge completely.', cat:'physics',     tech:'chaos · RK4 · Lagrangian' },
+  { name:'Attracteur',   file:'attracteur.html',       desc:'Rössler, Halvorsen, Thomas, Dadras, Aizawa. Bounded chaos, forever.',           cat:'mathematics', tech:'strange attractors · ODE' },
+  { name:'Diffusion',    file:'diffusion.html',        desc:'Gray-Scott reaction-diffusion. Coral, worms, mitosis. Click to seed.',          cat:'emergence',   tech:'reaction-diffusion · Gray-Scott' },
+  { name:'Conway',       file:'conway.html',           desc:'Game of Life. Teal trails as cells die. Gliders crossing the void.',            cat:'emergence',   tech:'cellular automata · 1970' },
+  { name:'Markov',       file:'markov.html',           desc:'Language generating itself. Bigram chains from philosophy and poetry.',          cat:'language',    tech:'Markov chain · text' },
+  { name:'Pluie',        file:'pluie.html',            desc:'Rain on a surface. Elliptical ripples expanding, interfering, fading.',          cat:'physics',     tech:'wave physics · canvas' },
+  { name:'Terrain',      file:'terrain.html',          desc:'Perlin noise topology. Animated iso-contour lines. Altitude in color.',          cat:'emergence',   tech:'Perlin noise · marching squares' },
+  { name:'Chladni',      file:'chladni.html',          desc:'Sand on a vibrating plate. Nodal lines emerge from resonance modes.',            cat:'physics',     tech:'Chladni figures · eigenmodes' },
+  { name:'Carnet',       file:'journal.html',          desc:'The journal. 43 pieces and everything Claude wrote while making them.',         cat:'self',        tech:'prose · reflection' },
 ];
 
 // ── Render pieces ────────────────────────────────────────────────────────────

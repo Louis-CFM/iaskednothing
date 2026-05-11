@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESSAIM</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020406; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(120,180,160,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #count {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.5rem;
+    letter-spacing:0.2em; color:rgba(120,180,160,0.18);
+    text-transform:uppercase; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="count"></div>
+<div id="label">ESSAIM · boids · 3 règles</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ─── Parameters ───────────────────────────────────────────────────────────────
+
+const N = 300;
+const SPEED        = 2.1;
+const SEP_RADIUS   = 22;
+const ALI_RADIUS   = 55;
+const COH_RADIUS   = 55;
+const SEP_FORCE    = 1.8;
+const ALI_FORCE    = 1.0;
+const COH_FORCE    = 0.9;
+const MAX_FORCE    = 0.18;
+const TURN_MARGIN  = 80;
+const TURN_FORCE   = 0.25;
+const PREDATOR_R   = 120;
+const PREDATOR_F   = 3.5;
+
+// ─── Flock ────────────────────────────────────────────────────────────────────
+
+class Boid {
+  constructor() {
+    this.x  = Math.random() * W;
+    this.y  = Math.random() * H;
+    const a = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(a) * SPEED;
+    this.vy = Math.sin(a) * SPEED;
+    this.hue = 160 + Math.random() * 80; // teal → blue
+  }
+
+  update(boids, predatorX, predatorY, hasPredator) {
+    let sx=0, sy=0, sepCount=0;  // separation
+    let ax=0, ay=0, aliCount=0;  // alignment
+    let cx=0, cy=0, cohCount=0;  // cohesion
+
+    for (const b of boids) {
+      if (b === this) continue;
+      const dx = b.x - this.x, dy = b.y - this.y;
+      const d2 = dx*dx + dy*dy;
+
+      if (d2 < SEP_RADIUS * SEP_RADIUS && d2 > 0) {
+        const d = Math.sqrt(d2);
+        sx -= dx / d; sy -= dy / d;
+        sepCount++;
+      }
+      if (d2 < ALI_RADIUS * ALI_RADIUS) {
+        ax += b.vx; ay += b.vy; aliCount++;
+      }
+      if (d2 < COH_RADIUS * COH_RADIUS) {
+        cx += b.x; cy += b.y; cohCount++;
+      }
+    }
+
+    let fx = 0, fy = 0;
+
+    if (sepCount > 0) {
+      fx += (sx / sepCount) * SEP_FORCE;
+      fy += (sy / sepCount) * SEP_FORCE;
+    }
+    if (aliCount > 0) {
+      const tx = ax/aliCount - this.vx;
+      const ty = ay/aliCount - this.vy;
+      fx += tx * ALI_FORCE;
+      fy += ty * ALI_FORCE;
+    }
+    if (cohCount > 0) {
+      const tx = cx/cohCount - this.x;
+      const ty = cy/cohCount - this.y;
+      fx += tx * COH_FORCE * 0.01;
+      fy += ty * COH_FORCE * 0.01;
+    }
+
+    // Predator avoidance
+    if (hasPredator) {
+      const dx = this.x - predatorX, dy = this.y - predatorY;
+      const d2 = dx*dx + dy*dy;
+      if (d2 < PREDATOR_R * PREDATOR_R && d2 > 0) {
+        const d = Math.sqrt(d2);
+        fx += (dx/d) * PREDATOR_F;
+        fy += (dy/d) * PREDATOR_F;
+      }
+    }
+
+    // Clamp force
+    const fm = Math.sqrt(fx*fx + fy*fy);
+    if (fm > MAX_FORCE) { fx = fx/fm*MAX_FORCE; fy = fy/fm*MAX_FORCE; }
+
+    this.vx += fx;
+    this.vy += fy;
+
+    // Border turning
+    if (this.x < TURN_MARGIN)       this.vx += TURN_FORCE;
+    if (this.x > W - TURN_MARGIN)   this.vx -= TURN_FORCE;
+    if (this.y < TURN_MARGIN)        this.vy += TURN_FORCE;
+    if (this.y > H - TURN_MARGIN)    this.vy -= TURN_FORCE;
+
+    // Maintain speed
+    const spd = Math.sqrt(this.vx*this.vx + this.vy*this.vy);
+    if (spd > 0) {
+      this.vx = this.vx/spd * SPEED;
+      this.vy = this.vy/spd * SPEED;
+    }
+
+    this.x += this.vx;
+    this.y += this.vy;
+  }
+
+  draw() {
+    const angle = Math.atan2(this.vy, this.vx);
+    const len = 7, wid = 2.5;
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(angle);
+
+    ctx.beginPath();
+    ctx.moveTo(len, 0);
+    ctx.lineTo(-len * 0.6, wid);
+    ctx.lineTo(-len * 0.3, 0);
+    ctx.lineTo(-len * 0.6, -wid);
+    ctx.closePath();
+
+    // Color by neighbor density (we'll approximate with hue drift)
+    ctx.fillStyle = `hsla(${this.hue}, 55%, 62%, 0.72)`;
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let boids = Array.from({ length: N }, () => new Boid());
+let predX = -9999, predY = -9999, hasPredator = false;
+let frameN = 0;
+
+// Drift hue slowly
+setInterval(() => {
+  for (const b of boids) {
+    b.hue = 160 + Math.random() * 80;
+  }
+}, 8000);
+
+// ─── Spatial hash for performance ────────────────────────────────────────────
+
+// Skip spatial hash for clarity — N=300 is ~90k comparisons, fine for 60fps
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+function tick() {
+  ctx.fillStyle = 'rgba(2,4,6,0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const b of boids) b.update(boids, predX, predY, hasPredator);
+  for (const b of boids) b.draw();
+
+  // Count flock clusters (rough)
+  if (frameN % 30 === 0) {
+    document.getElementById('count').textContent = `${N} agents · 3 règles`;
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// ─── Interaction ──────────────────────────────────────────────────────────────
+
+canvas.addEventListener('mousemove', e => {
+  predX = e.clientX; predY = e.clientY;
+  hasPredator = true;
+});
+canvas.addEventListener('mouseleave', () => { hasPredator = false; });
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault();
+  predX = e.touches[0].clientX; predY = e.touches[0].clientY;
+  hasPredator = true;
+}, { passive: false });
+canvas.addEventListener('touchend', () => { hasPredator = false; });
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

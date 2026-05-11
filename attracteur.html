@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ATTRACTEUR</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030205; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,140,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #name {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1rem; color:rgba(185,160,230,0.2);
+    letter-spacing:0.05em; pointer-events:none;
+    transition: color 1.5s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="name"></div>
+<div id="label">ATTRACTEUR · étrange · chaos borné</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy;
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W/2; cy = H/2;
+}
+resize(); addEventListener('resize', () => { resize(); next(); });
+
+// ─── Attractor definitions ────────────────────────────────────────────────────
+
+const ATTRACTORS = [
+  {
+    name: 'Rössler',
+    init: () => ({ x: 1, y: 0, z: 0 }),
+    step(s, dt) {
+      const a=0.2, b=0.2, c=5.7;
+      const dx = -s.y - s.z;
+      const dy =  s.x + a*s.y;
+      const dz =  b + s.z*(s.x - c);
+      return { x: s.x+dx*dt, y: s.y+dy*dt, z: s.z+dz*dt };
+    },
+    project(s) { return { px: s.x, py: s.y }; },
+    scale: 18, hue: 200,
+  },
+  {
+    name: 'Halvorsen',
+    init: () => ({ x: -1.48, y: -1.51, z: 2.04 }),
+    step(s, dt) {
+      const a = 1.89;
+      const dx = -a*s.x - 4*s.y - 4*s.z - s.y*s.y;
+      const dy = -a*s.y - 4*s.z - 4*s.x - s.z*s.z;
+      const dz = -a*s.z - 4*s.x - 4*s.y - s.x*s.x;
+      return { x: s.x+dx*dt, y: s.y+dy*dt, z: s.z+dz*dt };
+    },
+    project(s) { return { px: s.x, py: s.y }; },
+    scale: 38, hue: 280,
+  },
+  {
+    name: 'Thomas',
+    init: () => ({ x: 0.1, y: 0, z: 0 }),
+    step(s, dt) {
+      const b = 0.19;
+      const dx = Math.sin(s.y) - b*s.x;
+      const dy = Math.sin(s.z) - b*s.y;
+      const dz = Math.sin(s.x) - b*s.z;
+      return { x: s.x+dx*dt, y: s.y+dy*dt, z: s.z+dz*dt };
+    },
+    project(s) { return { px: s.x + s.z*0.3, py: s.y + s.z*0.3 }; },
+    scale: 70, hue: 160,
+  },
+  {
+    name: 'Dadras',
+    init: () => ({ x: 3, y: -1, z: 0 }),
+    step(s, dt) {
+      const p=3, q=2.7, r=1.7, c=2, e=9;
+      const dx = s.y - p*s.x + q*s.y*s.z;
+      const dy = r*s.y - s.x*s.z + s.z;
+      const dz = c*s.x*s.y - e*s.z;
+      return { x: s.x+dx*dt, y: s.y+dy*dt, z: s.z+dz*dt };
+    },
+    project(s) { return { px: s.x, py: s.z }; },
+    scale: 22, hue: 30,
+  },
+  {
+    name: 'Aizawa',
+    init: () => ({ x: 0.1, y: 0, z: 0 }),
+    step(s, dt) {
+      const a=0.95,b=0.7,c=0.6,d=3.5,e=0.25,f=0.1;
+      const dx = (s.z-b)*s.x - d*s.y;
+      const dy = d*s.x + (s.z-b)*s.y;
+      const dz = c + a*s.z - s.z*s.z*s.z/3 - s.x*s.x + f*s.z*s.x*s.x*s.x;
+      return { x: s.x+dx*dt, y: s.y+dy*dt, z: s.z+dz*dt };
+    },
+    project(s) { return { px: s.x + s.z*0.2, py: s.y + s.z*0.2 }; },
+    scale: 55, hue: 50,
+  },
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let attIdx = 0;
+let current;
+let state;
+let pts = [];
+let rotAngle = 0;
+let hue;
+let transitioning = false;
+let transAlpha = 1;
+
+function next() {
+  const att = ATTRACTORS[attIdx % ATTRACTORS.length];
+  attIdx++;
+  current = att;
+  state = att.init();
+  pts = [];
+  hue = att.hue;
+
+  // Warm up to get on the attractor
+  for (let i = 0; i < 2000; i++) {
+    state = att.step(state, 0.01);
+  }
+
+  document.getElementById('name').textContent = att.name;
+
+  // Clear
+  ctx.fillStyle = 'rgba(3,2,5,0.85)';
+  ctx.fillRect(0, 0, W, H);
+}
+
+next();
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+const MAX_PTS = 12000;
+const DT = 0.008;
+const STEPS_PER_FRAME = 12;
+
+let frameN = 0;
+
+function tick() {
+  // Soft fade
+  ctx.fillStyle = 'rgba(3,2,5,0.015)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Slow rotation
+  rotAngle += 0.0008;
+
+  // Step attractor
+  for (let s = 0; s < STEPS_PER_FRAME; s++) {
+    state = current.step(state, DT);
+    const { px, py } = current.project(state);
+
+    // Rotate px,py
+    const rx = px * Math.cos(rotAngle) - py * Math.sin(rotAngle);
+    const ry = px * Math.sin(rotAngle) + py * Math.cos(rotAngle);
+
+    pts.push({ x: cx + rx * current.scale, y: cy + ry * current.scale });
+    if (pts.length > MAX_PTS) pts.shift();
+  }
+
+  // Draw points
+  if (pts.length > 1) {
+    ctx.lineWidth = 0.6;
+    ctx.lineCap = 'round';
+
+    const start = Math.max(0, pts.length - STEPS_PER_FRAME - 2);
+    for (let i = start; i < pts.length - 1; i++) {
+      const t = i / pts.length;
+      const a = 0.3 + t * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x, pts[i].y);
+      ctx.lineTo(pts[i+1].x, pts[i+1].y);
+      ctx.strokeStyle = `hsla(${hue + t*40}, 55%, 65%, ${a})`;
+      ctx.stroke();
+    }
+  }
+
+  frameN++;
+
+  // Auto-cycle every ~600 frames (~10s)
+  if (frameN % 700 === 0) {
+    ctx.fillStyle = 'rgba(3,2,5,0.6)';
+    ctx.fillRect(0, 0, W, H);
+    next();
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// Click to jump to next
+canvas.addEventListener('click', () => {
+  ctx.fillStyle = 'rgba(3,2,5,0.8)';
+  ctx.fillRect(0, 0, W, H);
+  next();
+});
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

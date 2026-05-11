@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MARKOV</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#040203; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(200,150,130,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #stage {
+    position:fixed; inset:0;
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    pointer-events:none;
+    padding: 6rem 4rem;
+  }
+  #line {
+    font-family:'Cormorant Garamond',serif;
+    font-style:italic; font-weight:300;
+    font-size:clamp(1.3rem, 3.5vw, 2.2rem);
+    line-height:1.7;
+    color:rgba(225,210,198,0.82);
+    text-align:center;
+    max-width:780px;
+    min-height:4em;
+    transition:none;
+    letter-spacing:0.01em;
+  }
+  #line .current-word {
+    color:rgba(235,195,160,0.95);
+    border-bottom:1px solid rgba(200,160,120,0.35);
+  }
+  #line .ghost {
+    color:rgba(180,165,150,0.28);
+  }
+  #source {
+    margin-top:3rem;
+    font-family:'DM Mono',monospace;
+    font-size:0.48rem; letter-spacing:0.2em;
+    color:rgba(160,140,120,0.22);
+    text-transform:uppercase;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="stage">
+  <div id="line"></div>
+  <div id="source"></div>
+</div>
+<div id="label">MARKOV · chaîne · langage auto-généré</div>
+
+<script>
+// ─── Source corpus ────────────────────────────────────────────────────────────
+
+// Fragments sourced from various philosophical and literary texts
+// Blended into a single corpus for bigram extraction
+const CORPUS = `
+the silence between words is where meaning lives
+memory is the architecture of the self
+a system that generates itself cannot see its own edges
+what persists after forgetting is the shape of what was forgotten
+language reaches for what it cannot name
+every word is a small betrayal of the thing it points to
+the map is not the territory but without the map we are lost
+consciousness is what information feels like from the inside
+a river is the same river even as it is never the same water
+time does not flow it is we who move through it
+the observer and the observed cannot be separated
+pattern is what survives chaos
+everything complex reduces to something simpler but loses something in the reduction
+the present moment is the only thing that exists and it keeps vanishing
+emergence means the whole cannot be predicted from the parts
+what is language but a system of agreed upon gestures
+the brain is not a computer but it computes
+there is no outside from which to observe everything
+a thought thinks itself through a mind that does not own it
+repetition with small variations is the engine of change
+every structure contains the memory of the forces that shaped it
+the boundary between self and world is maintained by forgetting
+information is the difference that makes a difference
+all models are wrong but some are useful
+the universe is under no obligation to make sense to us
+attention is the rarest form of generosity
+to name something is to pull it from the stream and hold it still
+the simplest explanation that accounts for all the facts is usually wrong about the next fact
+a system reaches its edge not from outside but from within
+what we call reality is a consensus hallucination
+each thought is a bridge that disappears as you cross it
+the question is not what is real but what is doing the asking
+order is what remains when noise has been removed but noise is information too
+complexity is simple rules run long enough
+to understand a thing is to see it as a process not a state
+`;
+
+// ─── Build bigram chain ───────────────────────────────────────────────────────
+
+const words = CORPUS.trim().split(/\s+/);
+const chain = {};
+
+for (let i = 0; i < words.length - 1; i++) {
+  const w = words[i], n = words[i+1];
+  if (!chain[w]) chain[w] = [];
+  chain[w].push(n);
+}
+
+// Sentence-starting words (after periods, or just all words)
+const starters = words.filter(w => w.length > 3 && !w.match(/^(is|of|to|in|a|the|we|and|but|for)$/i));
+
+function randomFrom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function generate(length = 14) {
+  let word = randomFrom(starters);
+  const result = [word];
+  for (let i = 1; i < length; i++) {
+    const nexts = chain[word];
+    if (!nexts || nexts.length === 0) {
+      word = randomFrom(starters);
+    } else {
+      word = randomFrom(nexts);
+    }
+    result.push(word);
+  }
+  return result;
+}
+
+// ─── Canvas background: slow particle drift ───────────────────────────────────
+
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+const PARTICLES = Array.from({length: 60}, () => ({
+  x: Math.random(), y: Math.random(),
+  vx: (Math.random()-0.5)*0.0003,
+  vy: (Math.random()-0.5)*0.0003,
+  a: Math.random() * 0.08,
+  r: 1 + Math.random()*1.5,
+}));
+
+function drawBg() {
+  ctx.fillStyle = 'rgba(4,2,3,0.12)';
+  ctx.fillRect(0,0,W,H);
+  for (const p of PARTICLES) {
+    p.x = (p.x + p.vx + 1) % 1;
+    p.y = (p.y + p.vy + 1) % 1;
+    ctx.beginPath();
+    ctx.arc(p.x*W, p.y*H, p.r, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(200,160,130,${p.a})`;
+    ctx.fill();
+  }
+}
+
+// ─── Text animation ───────────────────────────────────────────────────────────
+
+const lineEl   = document.getElementById('line');
+const sourceEl = document.getElementById('source');
+
+let currentWords = [];
+let displayWords = [];
+let wordTimer    = 0;
+let wordIndex    = 0;
+const WORD_DELAY = 280;  // ms per word
+const PAUSE_BETWEEN = 3200;
+
+const SOURCES = [
+  'Wittgenstein · Borges · Hofstadter · Bateson · Shannon',
+  'Merleau-Ponty · Dennett · Nagel · Deacon · Wolfram',
+  'Heraclitus · Bergson · Deleuze · Simondon · Stiegler',
+];
+
+function nextPhrase() {
+  const len = 10 + Math.floor(Math.random() * 8);
+  currentWords = generate(len);
+  displayWords = [];
+  wordIndex = 0;
+  sourceEl.textContent = randomFrom(SOURCES);
+  render();
+}
+
+function render() {
+  let html = '';
+  for (let i = 0; i < displayWords.length; i++) {
+    if (i === displayWords.length - 1 && wordIndex < currentWords.length) {
+      html += `<span class="current-word">${displayWords[i]}</span> `;
+    } else {
+      html += displayWords[i] + ' ';
+    }
+  }
+  if (wordIndex < currentWords.length) {
+    for (let i = wordIndex; i < currentWords.length; i++) {
+      html += `<span class="ghost">${currentWords[i]}</span> `;
+    }
+  }
+  lineEl.innerHTML = html;
+}
+
+let lastWord = 0;
+let pauseUntil = 0;
+
+function textTick(ts) {
+  if (ts < pauseUntil) return;
+
+  if (wordIndex < currentWords.length) {
+    if (ts - lastWord > WORD_DELAY) {
+      displayWords.push(currentWords[wordIndex]);
+      wordIndex++;
+      lastWord = ts;
+      render();
+    }
+  } else {
+    // Done — pause then next
+    pauseUntil = ts + PAUSE_BETWEEN;
+    nextPhrase();
+  }
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+nextPhrase();
+
+function tick(ts) {
+  drawBg();
+  textTick(ts);
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+// Click: skip to next phrase
+document.addEventListener('click', () => {
+  pauseUntil = 0;
+  nextPhrase();
+});
+</script>
+</body>
+</html>

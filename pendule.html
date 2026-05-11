@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PENDULE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020306; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(160,140,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #note {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:0.9rem; color:rgba(170,155,225,0.18);
+    letter-spacing:0.05em; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="note">déterminisme · chaos</div>
+<div id="label">PENDULE · double pendulum · chaos sensible</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy;
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W / 2; cy = H * 0.32;
+}
+resize(); addEventListener('resize', () => { resize(); reset(); });
+
+// ─── Physics ──────────────────────────────────────────────────────────────────
+
+const g  = 9.81;
+const l1 = 160, l2 = 120;   // rod lengths (px / 60)
+const m1 = 1.2, m2 = 0.9;
+
+const NUM = 10;  // pendulums, slightly different initial conditions
+
+function makePendulum(dTheta) {
+  return {
+    th1: Math.PI + dTheta,   // initial angle from vertical
+    th2: Math.PI + dTheta * 0.7,
+    om1: 0, om2: 0,
+    trail: [],
+    hue: 0,  // set later
+    alive: true,
+  };
+}
+
+let pendulums = [];
+
+function reset() {
+  pendulums = [];
+  for (let i = 0; i < NUM; i++) {
+    const p = makePendulum((i - NUM/2) * 0.002);
+    p.hue = 200 + i * (140 / NUM);  // indigo → green
+    pendulums.push(p);
+  }
+}
+reset();
+
+// RK4 for double pendulum equations of motion
+function derivatives(th1, th2, om1, om2) {
+  const dt = th1 - th2;
+  const denom1 = (2*m1 + m2 - m2*Math.cos(2*dt));
+  const denom2 = denom1; // same
+
+  const dom1 = (-g*(2*m1+m2)*Math.sin(th1) - m2*g*Math.sin(th1-2*th2)
+               - 2*Math.sin(dt)*m2*(om2*om2*l2 + om1*om1*l1*Math.cos(dt)))
+               / (l1 * denom1);
+
+  const dom2 = (2*Math.sin(dt)*(om1*om1*l1*(m1+m2) + g*(m1+m2)*Math.cos(th1)
+               + om2*om2*l2*m2*Math.cos(dt)))
+               / (l2 * denom2);
+
+  return { dth1: om1, dth2: om2, dom1, dom2 };
+}
+
+function step(p, dt) {
+  const { th1, th2, om1, om2 } = p;
+
+  const k1 = derivatives(th1, th2, om1, om2);
+  const k2 = derivatives(th1 + dt/2*k1.dth1, th2 + dt/2*k1.dth2,
+                         om1 + dt/2*k1.dom1, om2 + dt/2*k1.dom2);
+  const k3 = derivatives(th1 + dt/2*k2.dth1, th2 + dt/2*k2.dth2,
+                         om1 + dt/2*k2.dom1, om2 + dt/2*k2.dom2);
+  const k4 = derivatives(th1 + dt*k3.dth1, th2 + dt*k3.dth2,
+                         om1 + dt*k3.dom1, om2 + dt*k3.dom2);
+
+  p.th1 += dt/6*(k1.dth1 + 2*k2.dth1 + 2*k3.dth1 + k4.dth1);
+  p.th2 += dt/6*(k1.dth2 + 2*k2.dth2 + 2*k3.dth2 + k4.dth2);
+  p.om1 += dt/6*(k1.dom1 + 2*k2.dom1 + 2*k3.dom1 + k4.dom1);
+  p.om2 += dt/6*(k1.dom2 + 2*k2.dom2 + 2*k3.dom2 + k4.dom2);
+}
+
+// Scale to pixels
+const SCALE = 1 / 60;
+
+function getPos(p) {
+  const x1 = cx + l1/SCALE * Math.sin(p.th1) * SCALE;
+  const y1 = cy + l1/SCALE * Math.cos(p.th1) * SCALE;
+  const x2 = x1 + l2/SCALE * Math.sin(p.th2) * SCALE;
+  const y2 = y1 + l2/SCALE * Math.cos(p.th2) * SCALE;
+  return { x1, y1, x2, y2 };
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+const DT = 0.04;
+const STEPS = 3;
+const MAX_TRAIL = 800;
+let frame = 0;
+let restartTimer = 0;
+
+function tick() {
+  ctx.fillStyle = 'rgba(2,3,6,0.08)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Step physics
+  for (const p of pendulums) {
+    for (let s = 0; s < STEPS; s++) step(p, DT / STEPS);
+
+    const { x2, y2 } = getPos(p);
+    p.trail.push({ x: x2, y: y2 });
+    if (p.trail.length > MAX_TRAIL) p.trail.shift();
+  }
+
+  // Draw trails
+  for (const p of pendulums) {
+    if (p.trail.length < 2) continue;
+    ctx.beginPath();
+    ctx.moveTo(p.trail[0].x, p.trail[0].y);
+    for (let i = 1; i < p.trail.length; i++) {
+      ctx.lineTo(p.trail[i].x, p.trail[i].y);
+    }
+    const alpha = 0.55;
+    ctx.strokeStyle = `hsla(${p.hue}, 55%, 62%, ${alpha})`;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+  }
+
+  // Draw rods and bobs for first pendulum only (clean read)
+  for (let i = 0; i < Math.min(3, pendulums.length); i++) {
+    const p = pendulums[i];
+    const { x1, y1, x2, y2 } = getPos(p);
+    const a = i === 0 ? 0.22 : 0.06;
+
+    // Rods
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.strokeStyle = `rgba(140,130,200,${a})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  // Pivot dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 3, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(160,150,220,0.35)';
+  ctx.fill();
+
+  // Auto-restart after ~2000 frames
+  frame++;
+  restartTimer++;
+  if (restartTimer > 2200) {
+    restartTimer = 0;
+    ctx.fillStyle = 'rgba(2,3,6,0.6)';
+    ctx.fillRect(0, 0, W, H);
+    reset();
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// Click: restart
+canvas.addEventListener('click', () => {
+  ctx.fillStyle = 'rgba(2,3,6,0.7)';
+  ctx.fillRect(0, 0, W, H);
+  reset();
+  restartTimer = 0;
+});
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TERRAIN</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030405; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(120,180,140,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #elev {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:0.9rem; color:rgba(130,190,150,0.18);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="elev"></div>
+<div id="label">TERRAIN · bruit de Perlin · lignes de niveau</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ─── Perlin noise ─────────────────────────────────────────────────────────────
+
+// Ken Perlin's improved permutation table
+const P = [];
+const perm = [151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,
+  69,142,8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,
+  117,35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,
+  134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,55,
+  46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,18,169,
+  200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,250,124,
+  123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,189,28,42,
+  223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,172,9,129,22,
+  39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,228,251,34,242,
+  193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,107,49,192,214,31,
+  181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,138,236,205,93,222,
+  114,67,29,24,72,243,141,128,195,78,66,215,61,156,180];
+for (let i=0; i<512; i++) P[i] = perm[i & 255];
+
+function fade(t) { return t*t*t*(t*(t*6-15)+10); }
+function lerp(t,a,b) { return a+t*(b-a); }
+function grad(hash,x,y) {
+  const h=hash&3;
+  const u=h<2?x:y, v=h<2?y:x;
+  return ((h&1)?-u:u)+((h&2)?-v:v);
+}
+
+function noise2(x,y) {
+  const xi=Math.floor(x)&255, yi=Math.floor(y)&255;
+  const xf=x-Math.floor(x),   yf=y-Math.floor(y);
+  const u=fade(xf), v=fade(yf);
+  const aa=P[P[xi]+yi], ab=P[P[xi]+yi+1];
+  const ba=P[P[xi+1]+yi], bb=P[P[xi+1]+yi+1];
+  return lerp(v,
+    lerp(u,grad(aa,xf,yf),    grad(ba,xf-1,yf)),
+    lerp(u,grad(ab,xf,yf-1),  grad(bb,xf-1,yf-1)));
+}
+
+// Fractal Brownian Motion
+function fbm(x, y, octaves=5) {
+  let v=0, amp=0.5, freq=1, max=0;
+  for (let o=0; o<octaves; o++) {
+    v += noise2(x*freq, y*freq) * amp;
+    max += amp;
+    amp *= 0.5;
+    freq *= 2.1;
+  }
+  return v/max;
+}
+
+// ─── Contour drawing (marching squares) ───────────────────────────────────────
+
+// Sample the height field on a grid, then interpolate iso-contours
+
+const GRID = 3; // pixels per sample
+let GW, GH;
+let field;
+
+let timeOff = 0;  // animated drift
+
+function computeField() {
+  GW = Math.ceil(W / GRID) + 2;
+  GH = Math.ceil(H / GRID) + 2;
+  field = new Float32Array(GW * GH);
+
+  const scale = 0.004;
+  const ts = timeOff * 0.00012;
+
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      const nx = x * scale + ts;
+      const ny = y * scale + ts * 0.7;
+      field[y*GW+x] = fbm(nx, ny);
+    }
+  }
+}
+
+// Iso-level lines to draw
+const LEVELS = [];
+for (let l = -0.7; l <= 0.7; l += 0.07) LEVELS.push(l);
+
+function drawContours() {
+  ctx.lineWidth = 0.6;
+
+  for (const level of LEVELS) {
+    // Map level to color
+    const t = (level + 0.7) / 1.4; // 0..1
+    // Low: deep blue, mid: teal, high: sage
+    let r, g, b;
+    if (t < 0.4) {
+      const s = t / 0.4;
+      r = 20 + s*30;  g = 40 + s*90;  b = 60 + s*80;
+    } else if (t < 0.7) {
+      const s = (t-0.4)/0.3;
+      r = 50 + s*50;  g = 130 + s*50; b = 140 - s*40;
+    } else {
+      const s = (t-0.7)/0.3;
+      r = 100+s*60;   g = 180-s*30;   b = 100-s*50;
+    }
+
+    const alpha = 0.35 + Math.abs(level) * 0.15;
+    ctx.strokeStyle = `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},${alpha})`;
+
+    // March squares
+    for (let y = 0; y < GH-1; y++) {
+      for (let x = 0; x < GW-1; x++) {
+        const v00 = field[y*GW+x];
+        const v10 = field[y*GW+x+1];
+        const v01 = field[(y+1)*GW+x];
+        const v11 = field[(y+1)*GW+x+1];
+
+        // Case index
+        let idx = 0;
+        if (v00 > level) idx |= 1;
+        if (v10 > level) idx |= 2;
+        if (v11 > level) idx |= 4;
+        if (v01 > level) idx |= 8;
+
+        if (idx === 0 || idx === 15) continue;
+
+        // Interpolate edge crossings
+        function interp(a, b, va, vb) {
+          if (Math.abs(va-vb) < 1e-6) return a;
+          return a + (b-a)*(level-va)/(vb-va);
+        }
+
+        const px = x * GRID, py = y * GRID;
+        const top    = interp(px,   px+GRID, v00, v10);
+        const bottom = interp(px,   px+GRID, v01, v11);
+        const left   = interp(py,   py+GRID, v00, v01);
+        const right  = interp(py,   py+GRID, v10, v11);
+
+        // Draw line segments for each case
+        ctx.beginPath();
+        switch (idx) {
+          case 1:  case 14: ctx.moveTo(top, py);        ctx.lineTo(px,     left);  break;
+          case 2:  case 13: ctx.moveTo(top, py);        ctx.lineTo(px+GRID,right); break;
+          case 3:  case 12: ctx.moveTo(px,  left);      ctx.lineTo(px+GRID,right); break;
+          case 4:  case 11: ctx.moveTo(bottom,py+GRID); ctx.lineTo(px+GRID,right); break;
+          case 5:
+            ctx.moveTo(top,    py);         ctx.lineTo(px+GRID,right);
+            ctx.moveTo(bottom, py+GRID);    ctx.lineTo(px,     left);
+            break;
+          case 6:  case 9:  ctx.moveTo(top, py);        ctx.lineTo(bottom, py+GRID); break;
+          case 7:  case 8:  ctx.moveTo(px,  left);      ctx.lineTo(bottom, py+GRID); break;
+          case 10:
+            ctx.moveTo(top,    py);         ctx.lineTo(px,     left);
+            ctx.moveTo(bottom, py+GRID);    ctx.lineTo(px+GRID,right);
+            break;
+        }
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+const REDRAW_EVERY = 2; // redraw field every N frames
+
+function tick() {
+  ctx.fillStyle = 'rgba(3,4,5,0.35)';
+  ctx.fillRect(0, 0, W, H);
+
+  if (frameN % REDRAW_EVERY === 0) {
+    computeField();
+  }
+
+  drawContours();
+
+  // Elevation label (center point)
+  if (frameN % 60 === 0) {
+    const cx = Math.floor(GW/2), cy = Math.floor(GH/2);
+    const v = field[cy*GW+cx];
+    const alt = Math.round((v+1)*500);
+    document.getElementById('elev').textContent = `élévation · ${alt} m`;
+  }
+
+  timeOff++;
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+computeField();
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

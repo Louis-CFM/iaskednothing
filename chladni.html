@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHLADNI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#040303; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(220,190,130,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #mode {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1rem; color:rgba(225,195,140,0.2);
+    letter-spacing:0.05em; pointer-events:none;
+    transition: color 1s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="mode"></div>
+<div id="label">CHLADNI · figures nodales · sable et son</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); startTransition(); });
+
+// ─── Chladni figure math ──────────────────────────────────────────────────────
+
+// For a square plate, nodal lines are where:
+// cos(m*π*x) * cos(n*π*y) - cos(n*π*x) * cos(m*π*y) = 0
+// (normalized x,y ∈ [0,1])
+// Combined modes produce more complex patterns
+
+const MODES = [
+  { m:2, n:1, name:'(2,1)' },
+  { m:3, n:1, name:'(3,1)' },
+  { m:2, n:3, name:'(2,3)' },
+  { m:3, n:2, name:'(3,2)' },
+  { m:4, n:1, name:'(4,1)' },
+  { m:3, n:4, name:'(3,4)' },
+  { m:4, n:3, name:'(4,3)' },
+  { m:5, n:2, name:'(5,2)' },
+  { m:2, n:5, name:'(2,5)' },
+  { m:4, n:5, name:'(4,5)' },
+  { m:5, n:4, name:'(5,4)' },
+  { m:6, n:1, name:'(6,1)' },
+];
+
+// ─── Particle simulation ──────────────────────────────────────────────────────
+
+// Particles feel a force pushing them toward nodal lines
+// dE/dx → force
+
+const N = 2400;
+let particles = [];
+let modeIdx = 0;
+let currentMode = MODES[0];
+let targetMode  = MODES[0];
+let blendT = 1.0;  // 0=target old, 1=target new (reverse: 0 = start of old→new, 1 = settled)
+
+function nodeValue(x, y, mode) {
+  const { m, n } = mode;
+  return Math.cos(m * Math.PI * x) * Math.cos(n * Math.PI * y)
+       - Math.cos(n * Math.PI * x) * Math.cos(m * Math.PI * y);
+}
+
+// Gradient of |f|² → force toward f=0 lines
+function force(x, y, mode, h=0.002) {
+  const f  = nodeValue(x, y, mode);
+  const fx = (nodeValue(x+h, y, mode) - nodeValue(x-h, y, mode)) / (2*h);
+  const fy = (nodeValue(x, y+h, mode) - nodeValue(x, y-h, mode)) / (2*h);
+  // Force = -∇(f²) = -2f∇f
+  return { fx: -2*f*fx, fy: -2*f*fy };
+}
+
+function initParticles() {
+  particles = [];
+  for (let i = 0; i < N; i++) {
+    particles.push({
+      x: 0.05 + Math.random() * 0.9,
+      y: 0.05 + Math.random() * 0.9,
+      vx: (Math.random()-0.5)*0.005,
+      vy: (Math.random()-0.5)*0.005,
+    });
+  }
+}
+
+function stepParticles(dt) {
+  const DAMP = 0.88;
+  const FORCE_SCALE = 0.8;
+  const NOISE = 0.0008;
+
+  for (const p of particles) {
+    // Force from current mode
+    const { fx, fy } = force(p.x, p.y, currentMode);
+    let ax = fx * FORCE_SCALE;
+    let ay = fy * FORCE_SCALE;
+
+    // Add tiny noise to prevent stuck clusters
+    ax += (Math.random()-0.5) * NOISE;
+    ay += (Math.random()-0.5) * NOISE;
+
+    p.vx = (p.vx + ax*dt) * DAMP;
+    p.vy = (p.vy + ay*dt) * DAMP;
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Soft bounce off edges
+    if (p.x < 0.02) { p.x = 0.02; p.vx = Math.abs(p.vx)*0.4; }
+    if (p.x > 0.98) { p.x = 0.98; p.vx = -Math.abs(p.vx)*0.4; }
+    if (p.y < 0.02) { p.y = 0.02; p.vy = Math.abs(p.vy)*0.4; }
+    if (p.y > 0.98) { p.y = 0.98; p.vy = -Math.abs(p.vy)*0.4; }
+  }
+}
+
+// ─── Rendering ────────────────────────────────────────────────────────────────
+
+// Map plate to canvas, centered with margin
+function toCanvas(x, y) {
+  const margin = Math.min(W, H) * 0.08;
+  const size   = Math.min(W, H) - margin * 2;
+  const ox     = (W - size) / 2;
+  const oy     = (H - size) / 2;
+  return { cx: ox + x * size, cy: oy + y * size };
+}
+
+let frameN = 0;
+let settleFrames = 0;
+const SETTLE_FRAMES = 280;
+
+function startTransition() {
+  settleFrames = 0;
+  modeIdx = (modeIdx + 1) % MODES.length;
+  currentMode = MODES[modeIdx];
+
+  // Scatter particles randomly (they'll re-settle)
+  for (const p of particles) {
+    p.vx += (Math.random()-0.5)*0.06;
+    p.vy += (Math.random()-0.5)*0.06;
+  }
+
+  document.getElementById('mode').textContent =
+    `mode ${currentMode.name} · fréquence propre`;
+}
+
+// ─── Background field ─────────────────────────────────────────────────────────
+
+let fieldCanvas, fieldCtx;
+function renderField() {
+  const FW = Math.floor(Math.min(W,H) * 0.8 / 4);
+  if (!fieldCanvas) {
+    fieldCanvas = document.createElement('canvas');
+    fieldCtx = fieldCanvas.getContext('2d');
+  }
+  fieldCanvas.width = fieldCanvas.height = FW;
+  const img = fieldCtx.createImageData(FW, FW);
+  const d = img.data;
+  for (let y = 0; y < FW; y++) {
+    for (let x = 0; x < FW; x++) {
+      const nx = x/FW, ny = y/FW;
+      const v = nodeValue(nx, ny, currentMode);
+      const abs = Math.min(1, Math.abs(v) * 1.5);
+      // Near nodal line → dark, away → dim warm
+      const bright = (1 - abs);
+      const r = Math.floor(bright * 35);
+      const g = Math.floor(bright * 25);
+      const b = Math.floor(bright * 15);
+      const i = (y*FW+x)*4;
+      d[i]=r; d[i+1]=g; d[i+2]=b; d[i+3]=255;
+    }
+  }
+  fieldCtx.putImageData(img, 0, 0);
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+function tick() {
+  ctx.fillStyle = 'rgba(4,3,3,0.55)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw field (soft background)
+  if (frameN % 30 === 0) renderField();
+  if (fieldCanvas) {
+    const margin = Math.min(W,H)*0.08;
+    const size   = Math.min(W,H) - margin*2;
+    ctx.globalAlpha = 0.3;
+    ctx.drawImage(fieldCanvas,
+      (W-size)/2, (H-size)/2, size, size);
+    ctx.globalAlpha = 1;
+  }
+
+  // Step and draw particles
+  const DT = 1;
+  for (let s = 0; s < 2; s++) stepParticles(DT);
+
+  for (const p of particles) {
+    const { cx: px, cy: py } = toCanvas(p.x, p.y);
+    const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy) * 800;
+    const brightness = Math.min(1, 0.5 + spd * 2);
+    ctx.beginPath();
+    ctx.arc(px, py, 1.2, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(230,200,140,${0.55 * brightness})`;
+    ctx.fill();
+  }
+
+  settleFrames++;
+  if (settleFrames >= SETTLE_FRAMES) {
+    startTransition();
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: next mode
+canvas.addEventListener('click', startTransition);
+
+initParticles();
+renderField();
+startTransition(); // sets initial mode
+document.getElementById('mode').textContent = `mode ${currentMode.name} · fréquence propre`;
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CONWAY</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020407; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(80,160,180,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #gen {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:0.9rem; color:rgba(80,160,180,0.2);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="gen"></div>
+<div id="label">CONWAY · game of life · 1970</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+const CELL = 8;
+let GW, GH;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  GW = Math.floor(W / CELL);
+  GH = Math.floor(H / CELL);
+  reset();
+}
+
+// ─── Grid ─────────────────────────────────────────────────────────────────────
+
+let grid, next, age;
+
+function reset() {
+  grid = new Uint8Array(GW * GH);
+  next = new Uint8Array(GW * GH);
+  age  = new Uint16Array(GW * GH);  // generations alive
+
+  // Seed with known patterns + random noise
+
+  // Random soup in center region
+  for (let y = Math.floor(GH*0.1); y < Math.floor(GH*0.9); y++) {
+    for (let x = Math.floor(GW*0.1); x < Math.floor(GW*0.9); x++) {
+      grid[y*GW+x] = Math.random() < 0.35 ? 1 : 0;
+    }
+  }
+
+  // Plant some known patterns
+  placePentomino(Math.floor(GW*0.3), Math.floor(GH*0.3));
+  placeGlider(Math.floor(GW*0.6), Math.floor(GH*0.2), 1);
+  placeGlider(Math.floor(GW*0.2), Math.floor(GH*0.6), -1);
+
+  generation = 0;
+}
+
+function set(x, y) {
+  if (x>=0&&x<GW&&y>=0&&y<GH) grid[y*GW+x] = 1;
+}
+
+function placeGlider(x, y, dir) {
+  // Classic glider
+  const g = [[0,1],[1,2],[2,0],[2,1],[2,2]];
+  for (const [dx,dy] of g) set(x+dx*dir, y+dy);
+}
+
+function placePentomino(x, y) {
+  // R-pentomino — generates rich patterns
+  [[1,0],[2,0],[0,1],[1,1],[1,2]].forEach(([dx,dy]) => set(x+dx,y+dy));
+}
+
+// ─── Step ─────────────────────────────────────────────────────────────────────
+
+let generation = 0;
+
+function step() {
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx===0&&dy===0) continue;
+          const nx = (x+dx+GW)%GW, ny = (y+dy+GH)%GH;
+          n += grid[ny*GW+nx];
+        }
+      }
+      const i = y*GW+x;
+      const alive = grid[i];
+      if (alive) {
+        next[i] = (n===2||n===3) ? 1 : 0;
+        age[i] = next[i] ? age[i]+1 : 0;
+      } else {
+        next[i] = n===3 ? 1 : 0;
+        if (next[i]) age[i] = 1;
+      }
+    }
+  }
+  const tmp = grid; grid = next; next = tmp;
+  generation++;
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+// Fading trails: keep a float buffer of "glow"
+let glow;
+
+function initGlow() {
+  glow = new Float32Array(GW * GH);
+}
+initGlow();
+
+function draw() {
+  ctx.fillStyle = 'rgba(2,4,7,0.28)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      const i = y*GW+x;
+      if (grid[i]) {
+        glow[i] = 1.0;
+      } else {
+        glow[i] *= 0.88;
+      }
+
+      const g = glow[i];
+      if (g < 0.02) continue;
+
+      // Color: young cells teal, old cells white-blue, dying cells dim
+      const a = age[i];
+      let r, grn, b;
+      if (grid[i]) {
+        if (a < 10) {
+          // Newborn: bright teal
+          r = 60; grn = 200; b = 210;
+        } else if (a < 50) {
+          // Mature: blue-white
+          r = 120; grn = 180; b = 230;
+        } else {
+          // Old: cooler
+          r = 80; grn = 140; b = 200;
+        }
+      } else {
+        // Dying: dim teal
+        r = 30; grn = 80; b = 100;
+      }
+
+      ctx.fillStyle = `rgba(${r},${grn},${b},${g * 0.85})`;
+      ctx.fillRect(x*CELL, y*CELL, CELL-1, CELL-1);
+    }
+  }
+
+  if (generation % 10 === 0) {
+    const alive = grid.reduce((s,v)=>s+v,0);
+    document.getElementById('gen').textContent = `génération ${generation} · ${alive} cellules`;
+  }
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+const STEPS_PER_FRAME = 1;
+let frameN = 0;
+
+function tick() {
+  for (let s = 0; s < STEPS_PER_FRAME; s++) step();
+  draw();
+  frameN++;
+
+  // Auto-restart after stagnation or long run
+  if (generation > 800 || (generation > 100 && generation % 50 === 0)) {
+    const alive = grid.reduce((s,v)=>s+v,0);
+    if (alive < 5 || alive > GW*GH*0.8) {
+      ctx.fillStyle='rgba(2,4,7,0.7)';
+      ctx.fillRect(0,0,W,H);
+      reset();
+      initGlow();
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// Click: place random blob
+canvas.addEventListener('click', e => {
+  const gx = Math.floor(e.clientX / CELL);
+  const gy = Math.floor(e.clientY / CELL);
+  const r = 6;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (dx*dx+dy*dy<=r*r && Math.random()<0.45) {
+        const nx = (gx+dx+GW)%GW, ny = (gy+dy+GH)%GH;
+        grid[ny*GW+nx] = 1;
+      }
+    }
+  }
+});
+
+canvas.addEventListener('dblclick', () => {
+  ctx.fillStyle='rgba(2,4,7,0.7)';
+  ctx.fillRect(0,0,W,H);
+  reset();
+  initGlow();
+});
+
+resize();
+addEventListener('resize', () => { resize(); initGlow(); });
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

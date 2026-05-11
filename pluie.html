@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLUIE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020305; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(100,150,200,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label">PLUIE · ondes · interférences</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ─── Ripple system ────────────────────────────────────────────────────────────
+
+class Ripple {
+  constructor(x, y) {
+    this.x = x; this.y = y;
+    this.r = 0;
+    this.life = 1.0;
+    this.speed = 1.2 + Math.random() * 0.6;
+    this.maxR = 80 + Math.random() * 120;
+    this.rings = 3; // concentric rings
+  }
+
+  update() {
+    this.r += this.speed;
+    this.life = Math.max(0, 1 - this.r / this.maxR);
+    return this.life > 0;
+  }
+
+  draw() {
+    for (let k = 0; k < this.rings; k++) {
+      const rk = this.r - k * 14;
+      if (rk <= 0) continue;
+      const lifeK = Math.max(0, 1 - rk / this.maxR);
+      if (lifeK < 0.01) continue;
+
+      // Ellipse (perspective-ish)
+      const rx = rk;
+      const ry = rk * 0.38;
+      const a  = lifeK * (1 - k * 0.28) * 0.6;
+
+      ctx.beginPath();
+      ctx.ellipse(this.x, this.y, rx, ry, 0, 0, Math.PI*2);
+      ctx.strokeStyle = `rgba(120,175,230,${a})`;
+      ctx.lineWidth = lifeK * 1.4;
+      ctx.stroke();
+
+      // Inner highlight
+      ctx.beginPath();
+      ctx.ellipse(this.x, this.y - ry*0.1, rx*0.7, ry*0.55, 0, Math.PI, Math.PI*2);
+      ctx.strokeStyle = `rgba(160,210,255,${a * 0.35})`;
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+
+    // Impact dot (first moments)
+    if (this.r < 20) {
+      const t = this.r / 20;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, (1-t) * 3, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(180,220,255,${(1-t) * 0.8})`;
+      ctx.fill();
+    }
+  }
+}
+
+// ─── Rain drops (vertical lines) ─────────────────────────────────────────────
+
+class Drop {
+  constructor() { this.reset(); }
+  reset() {
+    this.x = Math.random() * W;
+    this.y = -Math.random() * H * 0.5;
+    this.speed = 8 + Math.random() * 6;
+    this.len = 12 + Math.random() * 14;
+    this.a = 0.04 + Math.random() * 0.06;
+    this.angle = 0.12 + Math.random() * 0.08; // slight slant
+  }
+  update() {
+    this.y += this.speed;
+    this.x += this.angle;
+    if (this.y > H + this.len) this.reset();
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.moveTo(this.x, this.y);
+    ctx.lineTo(this.x - this.len * Math.sin(this.angle), this.y - this.len);
+    ctx.strokeStyle = `rgba(140,185,230,${this.a})`;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+  }
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let ripples = [];
+const drops = Array.from({ length: 120 }, () => new Drop());
+
+// Spawn ripples randomly
+function spawnRipple(x, y) {
+  if (ripples.length < 80) ripples.push(new Ripple(x, y));
+}
+
+// Auto-spawn rain ripples
+const SPAWN_INTERVAL = 200; // ms between auto spawns
+let lastSpawn = 0;
+
+// Surface sheen: subtle horizontal gradient moving
+let sheenOffset = 0;
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+
+function tick(ts) {
+  ctx.fillStyle = 'rgba(2,3,5,0.4)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Draw surface (subtle dark horizontal band in lower 60%)
+  if (frameN === 0) {
+    const g = ctx.createLinearGradient(0, H*0.4, 0, H);
+    g.addColorStop(0, 'rgba(5,8,18,0)');
+    g.addColorStop(1, 'rgba(4,8,18,0.6)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  // Rain drops
+  for (const d of drops) {
+    d.update(); d.draw();
+    // If drop hits "water surface" (below 55% height), spawn ripple
+    if (d.y > H * 0.4 && d.y < H * 0.4 + d.speed && Math.random() < 0.08) {
+      spawnRipple(d.x, H * (0.40 + Math.random() * 0.55));
+    }
+  }
+
+  // Auto-spawn ripples in lower area
+  if (ts - lastSpawn > SPAWN_INTERVAL) {
+    const x = W * (0.05 + Math.random() * 0.9);
+    const y = H * (0.45 + Math.random() * 0.5);
+    spawnRipple(x, y);
+    lastSpawn = ts;
+  }
+
+  // Update & draw ripples
+  ripples = ripples.filter(r => r.update());
+  for (const r of ripples) r.draw();
+
+  // Moving sheen line
+  sheenOffset = (sheenOffset + 0.3) % W;
+  ctx.save();
+  ctx.globalAlpha = 0.03;
+  const sg = ctx.createLinearGradient(sheenOffset - 200, 0, sheenOffset + 200, 0);
+  sg.addColorStop(0,   'rgba(150,200,255,0)');
+  sg.addColorStop(0.5, 'rgba(150,200,255,1)');
+  sg.addColorStop(1,   'rgba(150,200,255,0)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, H*0.45, W, H*0.55);
+  ctx.restore();
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: manual ripple
+canvas.addEventListener('click', e => {
+  spawnRipple(e.clientX, e.clientY);
+});
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  for (const t of e.touches) spawnRipple(t.clientX, t.clientY);
+}, { passive: false });
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
