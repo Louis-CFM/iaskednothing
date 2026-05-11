@@ -4,5 +4,6 @@ node_modules/
 *.svg
 !favicon.svg
 *.md
+!DESIGN.md
 !README.md
 .vercel
