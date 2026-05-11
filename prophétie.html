@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PROPHÉTIE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=DM+Mono:wght@300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030308; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.5rem;
+    letter-spacing:0.28em; color:rgba(200,240,200,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #note {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:0.92rem; color:rgba(180,230,200,0.18);
+    pointer-events:none; line-height:1.6;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="note">le passé: certain · le présent: un point · le futur: branches qui s'effacent</div>
+<div id="label">PROPHÉTIE · passé · présent · futur</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ── Multiple signals, each showing past and predicted future ─────────────────
+
+const SIGNAL_COUNT = 5;
+const HISTORY_LEN  = 260;
+const FUTURE_LEN   = 120;
+const BRANCH_COUNT = 5;
+
+// Smooth noise
+function smoothNoise(arr, seed) {
+  // Multi-octave signal
+  let v = 0;
+  v += Math.sin(arr * 0.04 + seed) * 0.5;
+  v += Math.sin(arr * 0.09 + seed * 1.7) * 0.25;
+  v += Math.sin(arr * 0.19 + seed * 3.1) * 0.15;
+  v += Math.sin(arr * 0.41 + seed * 5.3) * 0.07;
+  v += Math.sin(arr * 0.83 + seed * 9.7) * 0.03;
+  return v;
+}
+
+class Signal {
+  constructor(lane, seed) {
+    this.lane   = lane;   // 0..SIGNAL_COUNT-1 (vertical slot)
+    this.seed   = seed;
+    this.t      = 0;
+    this.history = [];
+    this.color  = this.pickColor(lane);
+    this.label  = this.pickLabel(lane);
+
+    // Pre-fill history
+    for (let i = 0; i < HISTORY_LEN; i++) {
+      this.history.push(smoothNoise(i, seed));
+    }
+  }
+
+  pickColor(i) {
+    const colors = [
+      [100, 220, 160],  // green — ecology / biology
+      [100, 180, 240],  // blue — physics
+      [180, 140, 240],  // violet — mathematics
+      [240, 200, 100],  // amber — language
+      [220, 120, 140],  // coral — self
+    ];
+    return colors[i % colors.length];
+  }
+
+  pickLabel(i) {
+    return ['ecology', 'physics', 'mathematics', 'language', 'self'][i];
+  }
+
+  step() {
+    this.t++;
+    const v = smoothNoise(this.t, this.seed);
+    this.history.push(v);
+    if (this.history.length > HISTORY_LEN) this.history.shift();
+  }
+}
+
+const signals = Array.from({ length: SIGNAL_COUNT }, (_, i) =>
+  new Signal(i, i * 1.618 + 0.3)
+);
+
+// ── Draw one signal ───────────────────────────────────────────────────────────
+
+function drawSignal(sig, slotY, slotH) {
+  const [r, g, b] = sig.color;
+  const midY   = slotY + slotH * 0.5;
+  const amp    = slotH * 0.32;
+  const nowX   = W * 0.55;  // "now" line position
+
+  const histStep = (nowX - 60) / HISTORY_LEN;
+  const futStep  = (W * 0.95 - nowX) / FUTURE_LEN;
+
+  // ── Past: solid line ──
+  ctx.beginPath();
+  for (let i = 0; i < sig.history.length; i++) {
+    const x = 60 + i * histStep;
+    const y = midY - sig.history[i] * amp;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.strokeStyle = `rgba(${r},${g},${b},0.65)`;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([]);
+  ctx.stroke();
+
+  // Past fill under curve
+  ctx.lineTo(nowX, midY);
+  ctx.lineTo(60, midY);
+  ctx.closePath();
+  ctx.fillStyle = `rgba(${r},${g},${b},0.04)`;
+  ctx.fill();
+
+  // ── Future: branching dashed lines ──
+  const lastVal = sig.history[sig.history.length - 1];
+  const lastX   = nowX;
+  const lastY   = midY - lastVal * amp;
+
+  for (let b2 = 0; b2 < BRANCH_COUNT; b2++) {
+    // Each branch has a drift and growing uncertainty
+    const drift   = (b2 / (BRANCH_COUNT - 1) - 0.5) * 0.4;
+    const branchSeed = sig.seed + b2 * 0.5;
+    const alphaB  = 0.28 - b2 * 0.04;
+
+    ctx.beginPath();
+    ctx.moveTo(lastX, lastY);
+
+    for (let fi = 1; fi <= FUTURE_LEN; fi++) {
+      const progress = fi / FUTURE_LEN;
+      const uncertainty = progress * progress * amp * 0.5;  // grows quadratically
+      const predVal  = smoothNoise(sig.t + fi, branchSeed) + drift * progress;
+      const noise2   = (Math.random() - 0.5) * uncertainty * 0.15;
+      const x = nowX + fi * futStep;
+      const y = midY - (predVal + noise2) * amp;
+      ctx.lineTo(x, y);
+    }
+
+    ctx.strokeStyle = `rgba(${r},${g},${b},${alphaB * (1 - b2 * 0.05)})`;
+    ctx.lineWidth = 1 - b2 * 0.15;
+    ctx.setLineDash([4, 6 + b2 * 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Uncertainty cone (fill)
+  const topBranch    = 0;
+  const bottomBranch = BRANCH_COUNT - 1;
+
+  ctx.beginPath();
+  ctx.moveTo(lastX, lastY);
+  // Top bound
+  for (let fi = 1; fi <= FUTURE_LEN; fi++) {
+    const progress   = fi / FUTURE_LEN;
+    const uncertainty = progress * progress * amp * 0.65;
+    const x = nowX + fi * futStep;
+    ctx.lineTo(x, lastY - uncertainty);
+  }
+  // Bottom bound
+  for (let fi = FUTURE_LEN; fi >= 1; fi--) {
+    const progress   = fi / FUTURE_LEN;
+    const uncertainty = progress * progress * amp * 0.65;
+    const x = nowX + fi * futStep;
+    ctx.lineTo(x, lastY + uncertainty);
+  }
+  ctx.closePath();
+  ctx.fillStyle = `rgba(${r},${g},${b},0.025)`;
+  ctx.fill();
+
+  // Label
+  ctx.font = '300 10px "DM Mono", monospace';
+  ctx.fillStyle = `rgba(${r},${g},${b},0.35)`;
+  ctx.letterSpacing = '0.15em';
+  ctx.fillText(sig.label.toUpperCase(), 20, midY + 4);
+}
+
+// ── Main draw ─────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+const MARGIN = 40;
+
+function draw() {
+  ctx.fillStyle = 'rgba(3,3,8,0.22)';
+  ctx.fillRect(0, 0, W, H);
+
+  const slotH = (H - MARGIN * 2) / SIGNAL_COUNT;
+
+  // "Now" line
+  const nowX = W * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(nowX, MARGIN);
+  ctx.lineTo(nowX, H - MARGIN);
+  ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([2, 8]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Now label
+  ctx.font = '300 9px "DM Mono", monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.12)';
+  ctx.textAlign = 'center';
+  ctx.fillText('NOW', nowX, MARGIN - 10);
+  ctx.fillText('PAST ←', nowX - 80, MARGIN - 10);
+  ctx.fillText('→ FUTURE', nowX + 85, MARGIN - 10);
+  ctx.textAlign = 'left';
+
+  // Draw signals
+  for (let i = 0; i < SIGNAL_COUNT; i++) {
+    const sig   = signals[i];
+    const slotY = MARGIN + i * slotH;
+    drawSignal(sig, slotY, slotH);
+
+    // Separator
+    if (i < SIGNAL_COUNT - 1) {
+      ctx.beginPath();
+      ctx.moveTo(0, slotY + slotH);
+      ctx.lineTo(W, slotY + slotH);
+      ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+  }
+
+  // Advance signals
+  if (frameN % 2 === 0) {
+    signals.forEach(s => s.step());
+  }
+
+  frameN++;
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+<script src="back.js"></script>
+</body>
+</html>

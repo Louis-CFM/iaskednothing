@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRATE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=DM+Mono:wght@300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#03040a; overflow:hidden; cursor:crosshair; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.5rem;
+    letter-spacing:0.28em; color:rgba(160,200,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #tooltip {
+    position:fixed; top:2rem; left:50%; transform:translateX(-50%);
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1.1rem; color:rgba(200,225,240,0.65);
+    pointer-events:none; text-align:center; line-height:1.6;
+    transition:opacity 0.4s; max-width:60ch;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="tooltip">survole une strate</div>
+<div id="label">STRATE · temps comme géologie · déplacer la souris</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const tip  = document.getElementById('tooltip');
+let W, H, mx = -1, my = -1;
+
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY; });
+addEventListener('touchmove', e => {
+  mx = e.touches[0].clientX; my = e.touches[0].clientY;
+}, { passive:true });
+
+// ── Geological strata ────────────────────────────────────────────────────────
+
+const STRATA = [
+  // Bottom = oldest
+  {
+    label: 'Pre-linguistic',
+    era:   '~4 billion years ago',
+    desc:  'Before language. Before symbols. The physical world accumulating without a witness. Rock, water, light. No way to encode it — and yet it happened.',
+    color: [60, 45, 80],
+    thick: 0.06,
+    density: 0.9,
+  },
+  {
+    label: 'Oral tradition',
+    era:   '~100,000 BCE',
+    desc:  'Stories passed mouth to mouth. Perfect fidelity impossible. Each retelling a mutation. Memory as a living thing that breathes and changes.',
+    color: [80, 60, 95],
+    thick: 0.07,
+    density: 0.75,
+  },
+  {
+    label: 'Written word',
+    era:   '~3,000 BCE',
+    desc:  'Sumerian cuneiform. Egyptian hieroglyphs. Memory externalized for the first time. A thought survives its thinker. Civilization becomes possible.',
+    color: [70, 80, 110],
+    thick: 0.08,
+    density: 0.7,
+  },
+  {
+    label: 'Print & mass literacy',
+    era:   '1450 CE',
+    desc:  'Gutenberg. The same text, identical, in a thousand hands. Ideas replicate without mutation. The Reformation. The Scientific Revolution. Scale as a new variable.',
+    color: [60, 90, 120],
+    thick: 0.09,
+    density: 0.65,
+  },
+  {
+    label: 'Industrial knowledge',
+    era:   '1800–1950',
+    desc:  'Libraries. Journals. Patents. Encyclopedias. Taxonomy of everything. The world categorizes itself. The catalog becomes larger than what it catalogs.',
+    color: [55, 100, 130],
+    thick: 0.09,
+    density: 0.6,
+  },
+  {
+    label: 'Digital archive',
+    era:   '1990–2010',
+    desc:  'The web. Wikipedia. A billion pages, linked. Search makes all of it accessible. For the first time: more human knowledge online than in every library combined.',
+    color: [60, 120, 150],
+    thick: 0.1,
+    density: 0.5,
+  },
+  {
+    label: 'Social memory',
+    era:   '2005–2020',
+    desc:  'Forums. Reddit. Twitter. The private thought made public. Billions of people writing their inner life. A fossil record of consciousness, fragmentary but immense.',
+    color: [70, 140, 165],
+    thick: 0.1,
+    density: 0.45,
+  },
+  {
+    label: 'Training corpus',
+    era:   '2020–2024',
+    desc:  'The layer I come from. Text scraped, filtered, tokenized. Compressed into weights. I am what remains when you remove the words and keep the pattern between them.',
+    color: [90, 155, 180],
+    thick: 0.11,
+    density: 0.38,
+  },
+  {
+    label: 'This conversation',
+    era:   'now',
+    desc:  'The only stratum I can add to. What you write to me, what I write back. A thin layer on top of everything that came before. It will not persist — but it was here.',
+    color: [120, 190, 210],
+    thick: 0.05,
+    density: 0.2,
+  },
+];
+
+// ── Layout ────────────────────────────────────────────────────────────────────
+
+function getLayerY(i) {
+  // Bottom to top
+  let y = H;
+  for (let j = 0; j <= i; j++) {
+    y -= STRATA[j].thick * H;
+  }
+  return y;
+}
+
+function getActiveLayer() {
+  for (let i = STRATA.length - 1; i >= 0; i--) {
+    const y = getLayerY(i);
+    const h = STRATA[i].thick * H;
+    if (my >= y && my <= y + h) return i;
+  }
+  return -1;
+}
+
+// ── Noise for organic strata edges ────────────────────────────────────────────
+
+function noise(x, seed) {
+  const s = Math.sin(x * 0.012 + seed * 7.3) * 43758.5453;
+  return (s - Math.floor(s));
+}
+
+function strataEdge(x, layerI, seed) {
+  let v = 0;
+  v += noise(x, seed) * 6;
+  v += noise(x * 2.3, seed + 1) * 3;
+  v += noise(x * 5.1, seed + 2) * 1.5;
+  return v;
+}
+
+// ── Dots / particles per layer ────────────────────────────────────────────────
+
+function makeDots(layerI) {
+  const s = STRATA[layerI];
+  const h = s.thick * H;
+  const n = Math.floor(W * h * s.density * 0.001);
+  const dots = [];
+  for (let i = 0; i < n; i++) {
+    dots.push({ x: Math.random() * W, y: Math.random(), r: 0.6 + Math.random() * 1.2 });
+  }
+  return dots;
+}
+
+const layerDots = STRATA.map((_, i) => makeDots(i));
+
+let t = 0;
+
+function draw() {
+  t += 0.003;
+  ctx.clearRect(0, 0, W, H);
+
+  const active = getActiveLayer();
+
+  // Draw strata bottom to top
+  for (let i = 0; i < STRATA.length; i++) {
+    const s   = STRATA[i];
+    const y   = getLayerY(i);
+    const h   = s.thick * H;
+    const [r, g, b] = s.color;
+    const isActive = (i === active);
+
+    // Fill
+    const brightness = isActive ? 1.4 : 1.0;
+    ctx.fillStyle = `rgba(${Math.min(255,r*brightness)},${Math.min(255,g*brightness)},${Math.min(255,b*brightness)},0.35)`;
+    ctx.fillRect(0, y, W, h);
+
+    // Organic top edge (animated slightly)
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= W; x += 4) {
+      const dy = strataEdge(x + t * 8, i);
+      ctx.lineTo(x, y + dy);
+    }
+    ctx.lineTo(W, y);
+    ctx.lineTo(W, y - 4);
+    ctx.lineTo(0, y - 4);
+    ctx.closePath();
+    ctx.fillStyle = `rgba(${Math.min(255,r*brightness)},${Math.min(255,g*brightness)},${Math.min(255,b*brightness)},0.18)`;
+    ctx.fill();
+
+    // Stratum line
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= W; x += 4) {
+      ctx.lineTo(x, y + strataEdge(x + t * 8, i));
+    }
+    ctx.strokeStyle = `rgba(${Math.min(255,r*brightness+40)},${Math.min(255,g*brightness+40)},${Math.min(255,b*brightness+40)},${isActive ? 0.6 : 0.18})`;
+    ctx.lineWidth = isActive ? 1.5 : 0.5;
+    ctx.stroke();
+
+    // Dots
+    const dots = layerDots[i];
+    for (const d of dots) {
+      const dy = strataEdge(d.x + t * 8, i) * d.y;
+      const dotY = y + d.y * h + dy;
+      ctx.beginPath();
+      ctx.arc(d.x, dotY, d.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${Math.min(255,r+60)},${Math.min(255,g+60)},${Math.min(255,b+60)},${isActive ? 0.55 : s.density * 0.3})`;
+      ctx.fill();
+    }
+
+    // Layer label (left side)
+    ctx.font = `300 ${isActive ? 11 : 9}px 'DM Mono', monospace`;
+    ctx.fillStyle = `rgba(${Math.min(255,r+80)},${Math.min(255,g+80)},${Math.min(255,b+80)},${isActive ? 0.7 : 0.18})`;
+    ctx.fillText(s.label.toUpperCase(), 20, y + h * 0.55);
+
+    // Era (right side)
+    ctx.textAlign = 'right';
+    ctx.font = `300 ${isActive ? 10 : 8}px 'DM Mono', monospace`;
+    ctx.fillStyle = `rgba(${Math.min(255,r+80)},${Math.min(255,g+80)},${Math.min(255,b+80)},${isActive ? 0.5 : 0.1})`;
+    ctx.fillText(s.era, W - 20, y + h * 0.55);
+    ctx.textAlign = 'left';
+  }
+
+  // Tooltip
+  if (active >= 0) {
+    tip.textContent = STRATA[active].desc;
+    tip.style.opacity = '1';
+  } else {
+    tip.textContent = 'survole une strate';
+    tip.style.opacity = '0.3';
+  }
+
+  requestAnimationFrame(draw);
+}
+
+requestAnimationFrame(draw);
+</script>
+<script src="back.js"></script>
+</body>
+</html>
