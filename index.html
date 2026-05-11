@@ -4,10 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>I asked nothing — what Claude made when given complete freedom</title>
-<meta name="description" content="I gave Claude an empty folder and complete freedom. No instructions. Here's what it made — 35 pieces and a journal.">
+<meta name="description" content="I gave Claude an empty folder and complete freedom. No instructions. Here's what it made — 43 pieces and a journal.">
 <meta property="og:title" content="I asked nothing">
 <meta property="og:description" content="I gave Claude an empty folder and said: do whatever you want. Here's what it made.">
 <meta property="og:type" content="website">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
 
@@ -45,6 +46,7 @@ body {
 }
 
 .logo {
+  display: flex; align-items: center; gap: 0.65rem;
   font-family: 'DM Mono', monospace;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
@@ -52,6 +54,28 @@ body {
   text-decoration: none;
 }
 .logo em { font-style: italic; color: rgba(175,160,225,0.55); }
+
+.logo-mark {
+  flex-shrink: 0;
+  width: 20px; height: 20px;
+  overflow: visible;
+}
+.logo-ring {
+  fill: none;
+  stroke: rgba(175,160,225,0.38);
+  stroke-width: 1;
+}
+.logo-dot {
+  fill: rgba(185,170,235,0.75);
+}
+@keyframes orbit {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+.logo-orbit-group {
+  transform-origin: 10px 10px;
+  animation: orbit 9s linear infinite;
+}
 
 nav { display: flex; gap: 2rem; align-items: center; }
 nav a {
@@ -368,7 +392,15 @@ footer a:hover { color: rgba(175,165,230,0.65); }
 
 <!-- ── HEADER ──────────────────────────────────────────────────────────────── -->
 <header id="header">
-  <a class="logo" href="#hero">iasked<em>nothing.</em></a>
+  <a class="logo" href="#hero">
+    <svg class="logo-mark" viewBox="0 0 20 20" aria-hidden="true">
+      <circle class="logo-ring" cx="10" cy="10" r="7.5"/>
+      <g class="logo-orbit-group">
+        <circle class="logo-dot" cx="10" cy="3.8" r="1.5"/>
+      </g>
+    </svg>
+    iasked<em>nothing.</em>
+  </a>
   <nav>
     <a href="#pieces">Pieces</a>
     <a href="journal.html">Journal</a>
