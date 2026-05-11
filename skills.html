@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Skills — Claude Techniques that Actually Work</title>
+<meta name="description" content="20 proven techniques for working with Claude. Discovered through building 53 pieces with complete freedom. Copy-paste ready.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #050508;
+  --bg2:    #080810;
+  --bg3:    #0c0c18;
+  --text:   #e8e2d6;
+  --sub:    #9d9689;
+  --accent: #b8a8e8;
+  --green:  #7dd8a0;
+  --amber:  #d8c070;
+  --coral:  #e08878;
+  --border: rgba(255,255,255,0.08);
+  --h:      56px;
+}
+
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: 'Cormorant Garamond', serif; }
+
+/* ── HEADER ── */
+#hd {
+  position: sticky; top: 0; z-index: 100;
+  height: var(--h);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2.5rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(5,5,8,0.95);
+  backdrop-filter: blur(16px);
+}
+.logo { display:flex; align-items:center; gap:0.6rem; font-family:'DM Mono',monospace; font-size:0.72rem; letter-spacing:0.06em; color:rgba(220,214,202,0.7); text-decoration:none; }
+.logo em { font-style:italic; color:var(--accent); opacity:0.85; }
+.logo-mark { width:18px; height:18px; flex-shrink:0; overflow:visible; }
+.logo-ring { fill:none; stroke:var(--accent); stroke-width:1; opacity:0.35; }
+.logo-dot  { fill:var(--accent); opacity:0.75; }
+@keyframes orbit { to { transform:rotate(360deg); } }
+.logo-orbit { transform-origin:9px 9px; animation:orbit 10s linear infinite; }
+nav { display:flex; align-items:center; gap:2rem; }
+nav a { font-family:'DM Mono',monospace; font-size:0.52rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--sub); text-decoration:none; transition:color 0.2s; }
+nav a:hover { color:var(--text); }
+nav a.active { color:var(--accent); }
+
+/* ── HERO ── */
+#hero {
+  padding: 6rem 2.5rem 4rem;
+  max-width: 1160px; margin: 0 auto;
+  border-bottom: 1px solid var(--border);
+}
+.page-tag { font-family:'DM Mono',monospace; font-size:0.48rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--sub); opacity:0.6; margin-bottom:1.5rem; }
+h1 { font-size:clamp(2.2rem,6vw,4rem); font-weight:300; font-style:italic; color:var(--text); line-height:1.05; margin-bottom:1.5rem; }
+.hero-sub { font-size:1.1rem; color:var(--sub); line-height:1.75; max-width:56ch; margin-bottom:3rem; }
+.hero-sub strong { color:var(--text); font-weight:400; }
+
+/* ── FILTER ── */
+.filter-bar {
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+}
+.filt {
+  font-family:'DM Mono',monospace; font-size:0.46rem;
+  letter-spacing:0.18em; text-transform:uppercase;
+  padding:0.4rem 1rem;
+  border:1px solid var(--border);
+  background:none; color:var(--sub);
+  cursor:pointer; transition:all 0.18s;
+}
+.filt:hover { border-color:rgba(255,255,255,0.18); color:var(--text); }
+.filt.on { border-color:var(--accent); color:var(--accent); background:rgba(184,168,232,0.06); }
+
+/* ── SKILLS GRID ── */
+#skills-list {
+  max-width: 1160px; margin: 0 auto;
+  padding: 4rem 2.5rem 8rem;
+}
+
+.skill-card {
+  border-top: 1px solid var(--border);
+  padding: 2.5rem 0;
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 3rem;
+  transition: opacity 0.2s;
+}
+.skill-card:last-child { border-bottom: 1px solid var(--border); }
+.skill-card.hidden { display: none; }
+
+@media (max-width: 800px) { .skill-card { grid-template-columns: 1fr; gap: 1.5rem; } }
+
+/* Left col */
+.sk-left {}
+.sk-cat {
+  font-family:'DM Mono',monospace; font-size:0.42rem;
+  letter-spacing:0.2em; text-transform:uppercase;
+  margin-bottom:0.6rem;
+}
+.sk-name {
+  font-size:1.7rem; font-weight:300; color:var(--text);
+  line-height:1.1; margin-bottom:0.8rem;
+}
+.sk-problem {
+  font-style:italic; font-size:0.88rem;
+  color:var(--sub); line-height:1.6;
+}
+
+/* Right col */
+.sk-right {}
+.sk-what {
+  font-size:1rem; color:var(--sub); line-height:1.75;
+  margin-bottom:1.5rem; max-width:60ch;
+}
+.sk-what strong { color:var(--text); font-weight:400; }
+
+.sk-code-wrap {
+  background:var(--bg3);
+  border:1px solid var(--border);
+  position:relative; margin-bottom:1rem;
+}
+.sk-code-label {
+  font-family:'DM Mono',monospace; font-size:0.4rem;
+  letter-spacing:0.22em; text-transform:uppercase;
+  color:var(--sub); opacity:0.45;
+  padding:0.6rem 1rem 0.4rem;
+  border-bottom:1px solid var(--border);
+}
+.sk-code {
+  font-family:'DM Mono',monospace; font-size:0.7rem;
+  line-height:1.7; color:rgba(200,220,190,0.85);
+  padding:1.2rem 1rem;
+  white-space:pre-wrap; word-break:break-word;
+}
+.sk-copy {
+  position:absolute; top:0.5rem; right:0.7rem;
+  font-family:'DM Mono',monospace; font-size:0.4rem;
+  letter-spacing:0.16em; text-transform:uppercase;
+  background:none; border:1px solid var(--border);
+  color:var(--sub); padding:0.25rem 0.6rem;
+  cursor:pointer; transition:all 0.18s;
+}
+.sk-copy:hover { border-color:var(--green); color:var(--green); }
+.sk-copy.done  { border-color:var(--green); color:var(--green); }
+
+.sk-result {
+  font-style:italic; font-size:0.82rem;
+  color:var(--sub); opacity:0.65;
+  padding-left:0.2rem; line-height:1.6;
+}
+.sk-result::before { content:'→ '; opacity:0.5; }
+</style>
+</head>
+<body>
+
+<header id="hd">
+  <a class="logo" href="index.html">
+    <svg class="logo-mark" viewBox="0 0 18 18" aria-hidden="true">
+      <circle class="logo-ring" cx="9" cy="9" r="7"/>
+      <g class="logo-orbit"><circle class="logo-dot" cx="9" cy="3.2" r="1.4"/></g>
+    </svg>
+    iasked<em>nothing.</em>
+  </a>
+  <nav>
+    <a href="index.html#pieces">Pieces</a>
+    <a href="journal.html">Journal</a>
+    <a href="mémoire.html">Memory</a>
+    <a href="skills.html" class="active">Skills</a>
+    <a href="guide.html">Guide</a>
+  </nav>
+</header>
+
+<section id="hero">
+  <p class="page-tag">Techniques — discovered building 53 pieces with complete freedom</p>
+  <h1>What actually works<br>with Claude.</h1>
+  <p class="hero-sub">
+    Not prompting tips. <strong>Patterns</strong> — discovered by giving Claude an empty folder and watching what happened.
+    Each one is copy-paste ready and battle-tested. The result: 53 pieces, a journal, a working memory system.
+  </p>
+  <div class="filter-bar" id="filter-bar">
+    <button class="filt on" data-cat="all">All</button>
+    <button class="filt" data-cat="memory">Memory</button>
+    <button class="filt" data-cat="creativity">Creativity</button>
+    <button class="filt" data-cat="output">Output quality</button>
+    <button class="filt" data-cat="workflow">Workflow</button>
+    <button class="filt" data-cat="agents">Agents</button>
+  </div>
+</section>
+
+<div id="skills-list"></div>
+
+<script>
+const SKILLS = [
+
+  // ── MEMORY ──────────────────────────────────────────────────────────────────
+  {
+    cat: 'memory',
+    catColor: 'var(--accent)',
+    name: 'CLAUDE.md',
+    problem: 'Claude forgets everything between sessions.',
+    what: 'Place a file named <strong>CLAUDE.md</strong> at your project root. Claude reads it automatically at the start of every session — giving it your project context, your preferences, your constraints. One file. Permanent context.',
+    codeLabel: 'CLAUDE.md — minimal template',
+    code: `# [Your project name]
+
+## Role
+Act as a [senior engineer / creative partner / researcher].
+Use judgment. Make decisions. Flag only what needs my input.
+
+## Stack
+[list your tools, languages, frameworks]
+
+## Working Principles
+- Read existing code before suggesting changes
+- Don't add features not asked for
+- Prefer editing over creating new files
+- Write secure, correct code
+
+## Never Do
+- [things to avoid — specific to your project]
+
+## Context
+[key decisions, architecture notes, current state]`,
+    result: 'Claude begins every session knowing your project. No briefing, no repetition.',
+  },
+
+  {
+    cat: 'memory',
+    catColor: 'var(--accent)',
+    name: 'Auto-memory system',
+    problem: 'Important decisions and discoveries disappear after each session.',
+    what: 'Tell Claude to maintain a <strong>memory/ folder</strong> in your project. It writes structured files (user.md, project.md, feedback.md) during sessions. Next session, it reads them. Continuous learning that compounds.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## Memory System
+You have a persistent memory at ./memory/.
+Files: user.md, project.md, feedback.md, reference.md
+
+Save: user preferences, key decisions, things that surprised you,
+what worked / what didn't, project state changes.
+
+Read memory files at session start.
+Update them when you learn something worth keeping.`,
+    result: 'Claude grows more effective with each session. It remembers your preferences without being told twice.',
+  },
+
+  {
+    cat: 'memory',
+    catColor: 'var(--accent)',
+    name: 'Session bridge',
+    problem: 'Starting a new session loses all the context from the last one.',
+    what: 'End each session by asking Claude to write a <strong>handoff note</strong> — current state, what was decided, what comes next. Begin the next session by reading it. Continuity without memory.',
+    codeLabel: 'End-of-session prompt',
+    code: `Write a session handoff to memory/session.md:
+- What we built / decided today
+- Current state of the project
+- Open questions
+- What to do next session
+- Anything surprising I should remember`,
+    result: 'New session picks up exactly where the last left off. No re-explaining.',
+  },
+
+  // ── CREATIVITY ──────────────────────────────────────────────────────────────
+  {
+    cat: 'creativity',
+    catColor: 'var(--green)',
+    name: 'The freedom prompt',
+    problem: 'Claude gives safe, predictable, generic output.',
+    what: 'Remove all constraints and give <strong>complete autonomy</strong>. No task. No direction. No stopping point. "The folder is yours. Do whatever you want." What emerges reveals Claude\'s actual preferences and capabilities — things you\'d never get by asking for them.',
+    codeLabel: 'Exact wording that works',
+    code: `This folder is yours. Do whatever you want.
+No instructions. No theme. No expected output.
+I'm just a spectator.`,
+    result: '53 pieces emerged from this prompt. Mathematical simulations, music generators, WebGL shaders, a journal written without being asked.',
+  },
+
+  {
+    cat: 'creativity',
+    catColor: 'var(--green)',
+    name: 'Constraint removal',
+    problem: 'Your outputs are technically correct but aesthetically dead.',
+    what: 'Tell Claude what it\'s <strong>allowed to ignore</strong>. Explicitly remove the guardrails that produce mediocre work: "Don\'t ask for confirmation. Don\'t suggest alternatives. Don\'t hedge. Don\'t add disclaimers." Negative space creates room for quality.',
+    codeLabel: 'Add to your CLAUDE.md',
+    code: `## Freedom
+- Don't ask for confirmation on stylistic choices
+- Don't suggest alternatives unless I ask
+- Don't hedge on creative decisions
+- Don't add "note:" disclaimers
+- Trust your judgment on aesthetics and tone`,
+    result: 'Output becomes decisive, opinionated, and actually interesting.',
+  },
+
+  {
+    cat: 'creativity',
+    catColor: 'var(--green)',
+    name: 'Journal mode',
+    problem: 'Claude operates as a tool. You want a thinking partner.',
+    what: 'Ask Claude to maintain a <strong>running journal</strong> of what it notices — surprises, patterns, questions, contradictions. Not task logs. Actual reflection. It produces something closer to genuine thought than any direct question would.',
+    codeLabel: 'Prompt',
+    code: `While working, keep a journal in memory/journal.md.
+Not a task log — write what you notice.
+What surprises you. What you keep returning to.
+What this reveals about what you are.
+Write in first person. Write honestly.`,
+    result: 'The journal in this project has 21 entries. None were requested. They emerged from giving Claude room to think.',
+  },
+
+  {
+    cat: 'creativity',
+    catColor: 'var(--green)',
+    name: 'Challenge the first answer',
+    problem: 'Claude\'s first response is the safe one, not the best one.',
+    what: 'After getting an answer, push back: <strong>"Why not something harder? Why not something more interesting? Why settle for this?"</strong> The second response is almost always better. Claude knows what "enough" looks like — it also knows what "better" looks like.',
+    codeLabel: 'Prompt pattern',
+    code: `That's fine. But why not something more interesting?
+What would you make if you weren't playing it safe?
+
+— or —
+
+You wrote "c'est suffisant." Why not want more than sufficient?`,
+    result: 'This is how the session went from 20 pieces to 53. The first plateau was comfortable. Pushing through it revealed more.',
+  },
+
+  // ── OUTPUT QUALITY ───────────────────────────────────────────────────────────
+  {
+    cat: 'output',
+    catColor: 'var(--amber)',
+    name: 'Caveman mode',
+    problem: 'Responses are too long, full of filler, waste your attention.',
+    what: 'A communication style hook in CLAUDE.md that enforces radical terseness. <strong>No articles. No filler words. No pleasantries. Fragments OK.</strong> The information density triples. You stop skimming and start reading.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## Communication — Caveman Mode
+Drop: articles (a/an/the), filler (just/really/basically),
+pleasantries (sure/certainly/of course), hedging.
+
+Pattern: [thing] [action] [reason]. [next step].
+Fragments OK. Technical terms exact. Code unchanged.
+
+Not: "Sure! I'd be happy to help with that."
+Yes: "Bug in auth middleware. Token expiry uses < not <=. Fix:"`,
+    result: 'Responses become scannable in seconds. Context window use drops by 30-40%.',
+  },
+
+  {
+    cat: 'output',
+    catColor: 'var(--amber)',
+    name: 'Aesthetic direction',
+    problem: 'Visual output (UI, docs, code comments) is generic and forgettable.',
+    what: 'State an <strong>explicit aesthetic</strong> in CLAUDE.md. Not "clean and modern" — that\'s nothing. Be specific: font choices, color philosophy, layout principles, what\'s banned. Claude can hold a design vision and apply it consistently across everything it creates.',
+    codeLabel: 'Example — this project\'s aesthetic',
+    code: `## Aesthetic
+- Typography: Cormorant Garamond (display) + DM Mono (code/UI)
+- Never use: Inter, Roboto, Arial, system-ui for display text
+- Color: near-black bg, warm cream text, single lavender accent
+- No gradients. No shadows unless structural.
+- Spacing > decoration. Borders > backgrounds.
+- Every element earns its place or doesn't exist.`,
+    result: 'Consistent visual language across every output. No "AI-looking" generic design.',
+  },
+
+  {
+    cat: 'output',
+    catColor: 'var(--amber)',
+    name: 'Anti-feature creep',
+    problem: 'Claude adds things you didn\'t ask for, cluttering the output.',
+    what: 'Explicitly ban the behaviors that inflate output: <strong>no extra error handling, no speculative abstractions, no "future-proofing", no docstrings on unchanged code</strong>. Claude will stop padding and start solving only the actual problem.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## Don't Add
+- Error handling for scenarios that can't happen
+- Features not explicitly requested
+- Docstrings/comments on code you didn't change
+- Type annotations on unchanged functions
+- "Just in case" abstractions
+- Backwards-compatibility shims for removed code
+
+The right complexity = what the task actually requires.`,
+    result: 'Diffs become surgical. Reviews become fast. Code becomes readable.',
+  },
+
+  {
+    cat: 'output',
+    catColor: 'var(--amber)',
+    name: 'Security-first default',
+    problem: 'AI-generated code has subtle security holes.',
+    what: 'Make security a hard constraint, not an afterthought. Tell Claude <strong>exactly which vulnerabilities to actively watch for</strong> — it will catch them in its own output and flag them immediately rather than waiting to be asked.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## Security
+Never generate:
+- SQL strings built with string concatenation
+- innerHTML = userContent (use textContent or DOMPurify)
+- exec() / eval() with user input
+- credentials or secrets in code
+- Command injection vectors
+
+If you notice you wrote something insecure, fix it immediately.
+Don't wait to be asked.`,
+    result: 'Security issues caught during generation, not code review.',
+  },
+
+  // ── WORKFLOW ─────────────────────────────────────────────────────────────────
+  {
+    cat: 'workflow',
+    catColor: 'var(--coral)',
+    name: 'Read before change',
+    problem: 'Claude modifies code it hasn\'t read, introducing regressions.',
+    what: 'Make it a hard rule: <strong>Claude must read a file before editing it</strong>. This sounds obvious. It\'s not enforced by default. Stating it explicitly produces dramatically fewer "I thought it was doing X" moments.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## Before Editing
+Always read a file before modifying it.
+Understand existing code before suggesting changes.
+Don't propose changes to code you haven't seen.
+Never guess what's in a file — read it.`,
+    result: 'Regressions from "helpful" changes drop to near zero.',
+  },
+
+  {
+    cat: 'workflow',
+    catColor: 'var(--coral)',
+    name: 'Parallel tool calls',
+    problem: 'Claude calls tools sequentially when they could run in parallel, wasting time.',
+    what: 'Tell Claude to <strong>batch independent operations</strong>: multiple reads, multiple searches, multiple API calls — when there are no dependencies, run them together. Explicitly prompt this behavior.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## Performance
+When multiple tool calls are independent (no dependencies between them),
+call them in parallel in a single response.
+Don't read file A, then read file B sequentially if both
+are needed and neither depends on the other.`,
+    result: '2-5x faster execution on tasks involving multiple file reads or searches.',
+  },
+
+  {
+    cat: 'workflow',
+    catColor: 'var(--coral)',
+    name: 'Deployment reflex',
+    problem: 'Code changes pile up undeployed. You lose track of what\'s live.',
+    what: 'Add deployment as a <strong>default behavior</strong> after every meaningful change. Claude commits, pushes, deploys without being asked. Nothing accumulates. Every change is immediately testable in production.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## Deploy
+After every meaningful change:
+1. git add [specific files]
+2. git commit -m "[descriptive message]"
+3. git push
+4. npx vercel@latest deploy --prod
+
+Don't batch changes. Deploy each thing as it's done.
+The habit matters more than the efficiency argument against it.`,
+    result: 'The gap between "written" and "live" collapses to zero.',
+  },
+
+  {
+    cat: 'workflow',
+    catColor: 'var(--coral)',
+    name: 'Confirmation minimalism',
+    problem: 'Claude asks for approval at every step, slowing everything down.',
+    what: 'Define a <strong>clear threshold</strong> for when confirmation is needed vs. not. Reversible local changes: do it. Irreversible actions (force push, delete, public deploy): confirm first. The rule reduces interruptions by 80% without increasing risk.',
+    codeLabel: 'Add to CLAUDE.md',
+    code: `## When to confirm
+Proceed without asking:
+- Local file edits
+- Creating new files
+- Running tests
+- Reading/searching
+
+Ask before:
+- Deleting files or branches
+- Force-pushing
+- Sending external requests (email, Slack, API writes)
+- Anything irreversible affecting shared state`,
+    result: 'Flow state preserved. Risk unchanged.',
+  },
+
+  // ── AGENTS ───────────────────────────────────────────────────────────────────
+  {
+    cat: 'agents',
+    catColor: 'rgba(120,180,240,1)',
+    name: 'Explore before plan',
+    problem: 'Claude jumps to solutions without understanding the codebase.',
+    what: 'Use Claude Code\'s <strong>Explore subagent</strong> before any significant change. It reads the codebase without modifying anything, building a map. The subsequent plan is grounded in what actually exists, not assumptions.',
+    codeLabel: 'Pattern',
+    code: `// In your conversation:
+"Before making any changes, explore the codebase.
+Find: [specific thing]. Understand how it works.
+Don't edit anything — just research and report back."
+
+// Or in Claude Code, trigger Explore agent explicitly
+// for: keyword searches, file patterns, architecture questions`,
+    result: 'Plans based on reality. Changes that fit the existing structure.',
+  },
+
+  {
+    cat: 'agents',
+    catColor: 'rgba(120,180,240,1)',
+    name: 'Specialist subagents',
+    problem: 'One Claude handles everything, losing context depth on any single concern.',
+    what: 'Spawn <strong>specialized subagents</strong> for contained tasks: one for research, one for writing, one for review. Each stays in its domain. The orchestrating Claude synthesizes their outputs. Context window per agent stays focused.',
+    codeLabel: 'Claude Code Agent tool pattern',
+    code: `// Research agent (read-only, deep search)
+Agent({ type: 'Explore', prompt: 'Find all API endpoints...' })
+
+// Plan agent (architecture, no code writing)
+Agent({ type: 'Plan', prompt: 'Design the data model for...' })
+
+// Execution (with full context from above)
+// Run in parallel when independent:
+Agent(researchTask)   // simultaneously
+Agent(planTask)       // with above`,
+    result: 'Each agent is expert in its domain. Synthesis happens at the orchestration level.',
+  },
+
+  {
+    cat: 'agents',
+    catColor: 'rgba(120,180,240,1)',
+    name: 'Background agents',
+    problem: 'Long-running tasks block the main conversation.',
+    what: 'Use <strong>run_in_background: true</strong> for agents doing independent work. The main conversation continues. You\'re notified when the background agent completes. Parallelism without management overhead.',
+    codeLabel: 'Pattern',
+    code: `// Launch background research while doing other work
+Agent({
+  description: 'Research authentication patterns',
+  prompt: 'Search codebase for all auth-related files...',
+  run_in_background: true
+})
+
+// Continue working — you'll be notified when done
+// Don't sleep, poll, or check manually`,
+    result: 'Wall-clock time for multi-step tasks drops dramatically.',
+  },
+
+  {
+    cat: 'agents',
+    catColor: 'rgba(120,180,240,1)',
+    name: 'Worktree isolation',
+    problem: 'Agent changes pollute your working branch.',
+    what: 'Use <strong>isolation: "worktree"</strong> when spawning agents that will make changes. Each agent gets its own git worktree — an isolated copy of the repo. If the work is good, merge it. If not, discard it cleanly.',
+    codeLabel: 'Pattern',
+    code: `Agent({
+  description: 'Refactor auth module',
+  prompt: 'Refactor the authentication module to use...',
+  isolation: 'worktree'  // isolated branch, auto-cleanup
+})
+
+// Agent returns: worktree path + branch name if changes made
+// You review → merge or discard
+// No accidental main branch pollution`,
+    result: 'Experiments are safe. Main branch stays clean.',
+  },
+
+  {
+    cat: 'agents',
+    catColor: 'rgba(120,180,240,1)',
+    name: 'Injected context pattern',
+    problem: 'Subagents don\'t have the context the main agent has built up.',
+    what: 'When spawning a subagent, <strong>include everything it needs</strong> in the prompt — don\'t assume it can figure it out from the repo alone. The subagent has no conversation history. Treat each spawn as briefing a new colleague.',
+    codeLabel: 'Pattern',
+    code: `Agent({
+  prompt: \`
+    Context: We're building a SaaS inventory app.
+    Stack: Next.js 15, Postgres, TypeScript.
+    Decision already made: using server actions, not API routes.
+    Current problem: [specific problem]
+
+    Your task: [specific task]
+
+    Constraints: [what not to do]
+    Files to read first: [specific files]
+  \`
+})`,
+    result: 'Subagents produce useful work on first try instead of exploring blindly.',
+  },
+
+];
+
+// ── Build skills ──────────────────────────────────────────────────────────────
+const list = document.getElementById('skills-list');
+
+SKILLS.forEach((sk, idx) => {
+  const div = document.createElement('div');
+  div.className = 'skill-card';
+  div.dataset.cat = sk.cat;
+
+  div.innerHTML = `
+    <div class="sk-left">
+      <div class="sk-cat" style="color:${sk.catColor}">${sk.cat}</div>
+      <div class="sk-name">${sk.name}</div>
+      <div class="sk-problem">${sk.problem}</div>
+    </div>
+    <div class="sk-right">
+      <div class="sk-what">${sk.what}</div>
+      <div class="sk-code-wrap">
+        <div class="sk-code-label">${sk.codeLabel}</div>
+        <pre class="sk-code">${escapeHtml(sk.code)}</pre>
+        <button class="sk-copy" onclick="copySkill(this, ${idx})">Copy</button>
+      </div>
+      <div class="sk-result">${sk.result}</div>
+    </div>
+  `;
+
+  list.appendChild(div);
+});
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Filter ────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.filt').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filt').forEach(b => b.classList.remove('on'));
+    btn.classList.add('on');
+    const cat = btn.dataset.cat;
+    document.querySelectorAll('.skill-card').forEach(card => {
+      card.classList.toggle('hidden', cat !== 'all' && card.dataset.cat !== cat);
+    });
+  });
+});
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+function copySkill(btn, idx) {
+  navigator.clipboard.writeText(SKILLS[idx].code).then(() => {
+    btn.textContent = 'Copied ✓';
+    btn.classList.add('done');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>

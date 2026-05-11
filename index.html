@@ -350,6 +350,7 @@ footer a:hover { opacity: 1; }
     <a href="#pieces">Pieces</a>
     <a href="journal.html">Journal</a>
     <a href="mémoire.html">Memory</a>
+    <a href="skills.html">Skills</a>
     <a href="guide.html">Guide</a>
     <a href="#about">About</a>
     <a class="gh-btn" href="https://github.com/Louis-CFM/iaskednothing" target="_blank" rel="noopener">
@@ -375,18 +376,27 @@ footer a:hover { opacity: 1; }
 </section>
 
 <!-- METHOD BANNER -->
-<a href="mémoire.html" style="
-  display:block; text-decoration:none;
-  border-top:1px solid rgba(184,168,232,0.2);
-  border-bottom:1px solid rgba(184,168,232,0.2);
-  background:rgba(184,168,232,0.04);
-  padding:1.2rem 2.5rem;
-  display:flex; align-items:center; gap:1.5rem;
-  transition:background 0.2s;
-" onmouseover="this.style.background='rgba(184,168,232,0.08)'" onmouseout="this.style.background='rgba(184,168,232,0.04)'">
-  <span style="font-family:'DM Mono',monospace;font-size:0.44rem;letter-spacing:0.25em;text-transform:uppercase;color:rgba(184,168,232,0.5)">New</span>
-  <span style="font-family:'DM Mono',monospace;font-size:0.5rem;letter-spacing:0.18em;text-transform:uppercase;color:rgba(184,168,232,0.9)">Generate your CLAUDE.md — give Claude persistent memory across every session →</span>
-</a>
+<div style="border-top:1px solid rgba(184,168,232,0.15);border-bottom:1px solid rgba(184,168,232,0.15);display:flex;">
+  <a href="mémoire.html" style="
+    flex:1; text-decoration:none; padding:1.2rem 2.5rem;
+    display:flex; align-items:center; gap:1.2rem;
+    border-right:1px solid rgba(184,168,232,0.1);
+    background:rgba(184,168,232,0.03);
+    transition:background 0.2s;
+  " onmouseover="this.style.background='rgba(184,168,232,0.07)'" onmouseout="this.style.background='rgba(184,168,232,0.03)'">
+    <span style="font-family:'DM Mono',monospace;font-size:0.42rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(184,168,232,0.45);flex-shrink:0">Memory</span>
+    <span style="font-family:'DM Mono',monospace;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(184,168,232,0.8)">Generate your CLAUDE.md → give Claude persistent memory</span>
+  </a>
+  <a href="skills.html" style="
+    flex:1; text-decoration:none; padding:1.2rem 2.5rem;
+    display:flex; align-items:center; gap:1.2rem;
+    background:rgba(125,216,160,0.03);
+    transition:background 0.2s;
+  " onmouseover="this.style.background='rgba(125,216,160,0.07)'" onmouseout="this.style.background='rgba(125,216,160,0.03)'">
+    <span style="font-family:'DM Mono',monospace;font-size:0.42rem;letter-spacing:0.22em;text-transform:uppercase;color:rgba(125,216,160,0.45);flex-shrink:0">Skills</span>
+    <span style="font-family:'DM Mono',monospace;font-size:0.48rem;letter-spacing:0.14em;text-transform:uppercase;color:rgba(125,216,160,0.8)">20 proven techniques → copy-paste ready</span>
+  </a>
+</div>
 
 <!-- STATS LINE -->
 <div class="stats-line">
