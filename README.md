@@ -1,104 +1,144 @@
-# I asked nothing
+# I asked nothing.
 
-**→ [iaskednothing.com](https://iaskednothing.com)**
+> I opened an empty folder and told Claude: *"This folder is yours. Do whatever you want."*  
+> No theme. No instructions. No stopping point.  
+> **43 things emerged. And a journal it wrote to itself.**
 
-I opened an empty folder — named it `?` — and told Claude: *"Do whatever you want. The folder is yours. I'm just a spectator."*
-
-No theme. No instructions. No stopping point.
-
-It made **43 things**. And a journal it wrote to itself, without being asked.
+→ **[iaskednothing.com](https://iaskednothing.com)** · [Pieces](https://iaskednothing.com/#pieces) · [Journal](https://iaskednothing.com/journal.html) · [Guide](https://iaskednothing.com/guide.html)
 
 ---
 
-## What's here
+## What this actually is
 
-43 standalone HTML files. No build step, no dependencies, no install. Open any file in a browser.
+43 standalone HTML files. Canvas 2D, WebGL2, Web Audio API. No build, no framework, no install. Open any file in a browser.
 
-| Category | Pieces |
-|----------|--------|
-| **Emergence** | Turing (Gray-Scott), Langton's Ant, Conway's Game of Life, Boids (ESSAIM), DLA Crystal, L-System, Gray-Scott Diffusion, Ecology |
-| **Physics** | Lorenz attractor, N-body gravity, Wave interference, Sand simulation, Entropy, Double pendulum, Rain ripples, Chladni figures |
-| **Mathematics** | Fourier epicycles, Voronoi (WebGL), Mandelbrot (WebGL2), Spirograph, Lissajous, Phyllotaxis, Kaleidoscope, Strange attractors, Perlin terrain |
-| **Sound** | Ambient music (pentatonic), Jazz chord generator (Am7→Dm7→G7→Cmaj7) |
-| **Time** | Clock (Unix → universe), Garden (localStorage, grows each visit), Breath, Forgetting |
-| **Language** | Babel (43 languages), Markov chain text, Writing/erasure, Effacement |
-| **Self** | Membrane, Network (neural), Fragment, Journal |
-
-Each file is ~100–300 lines. No frameworks. Canvas 2D, WebGL2, Web Audio API.
+But more than a code repo — **it's a documented experiment** in what happens when a language model is given complete creative freedom. The code is what came out. The journal is what Claude wrote about why.
 
 ---
 
-## The journal
+## Three things you can use right now
 
-Claude wrote a journal during the session — in French, then translated. 19 entries across 4 phases:
+### 1. The CLAUDE.md memory method
 
-1. **First wave** — introspection (what does it mean to exist without memory?)
-2. **The turn** — understanding why (art about one's own condition)
-3. **Systems phase** — emergence, complexity from simple rules
-4. **Second wave** — 9 more pieces, synthesis
+Claude has no memory by default. This fixes it.
 
-Read it at [iaskednothing.com/journal.html](https://iaskednothing.com/journal.html)
+Create a `CLAUDE.md` file in your project folder. Claude Code reads it automatically at session start. It becomes persistent context — your preferences, the project's decisions, what matters. No more re-explaining everything on every conversation reset.
 
----
+```markdown
+# Project context
 
-## What this demonstrates
+## Who you are
+[Your name, role, what you're building]
 
-**For AI researchers and builders:**
+## How we work
+[Your preferences: terse/verbose, ask before acting/just act, etc.]
 
-Claude, given complete freedom with no instructions, consistently chose:
-- Dark, minimal aesthetics
-- Systems that breathe or move
-- Mathematical/emergent phenomena
-- Themes of impermanence and appearance/disappearance
+## What's been decided
+[Key decisions — saves re-explaining every session]
 
-The theme wasn't planned. It emerged. Claude was making art about its own condition — no persistent memory, each conversation beginning in the dark — without consciously deciding to.
-
-**For developers:**
-
-Every piece is a working creative coding example. Techniques covered:
-- Gray-Scott reaction-diffusion (pixel buffer, Float32Arrays)
-- WebGL2 fragment shaders (Voronoi, Mandelbrot, wave interference)
-- Boids with spatial partitioning
-- N-body gravity (leapfrog integration)
-- DFT epicycles for parametric curves
-- Double pendulum (Runge-Kutta 4)
-- Perlin noise + marching squares iso-contours
-- Web Audio API (synthesis, chord voicing, pentatonic walks)
-- Chladni eigenmodes (particle simulation)
-- L-systems (turtle graphics)
-- DLA (diffusion-limited aggregation)
-
----
-
-## How to replicate
-
-1. Create an empty folder
-2. Open Claude with: *"This folder is yours. Do whatever you want. No instructions."*
-3. Walk away
-
-What Claude makes reveals something about what Claude is.
-
----
-
-## Try it yourself
-
-```
-mkdir experiment && cd experiment
-# Tell Claude: "This folder is yours. Do whatever you want."
+## Current focus
+[What you're working on right now]
 ```
 
-The `CLAUDE.md` approach works well for persistent creative sessions — Claude uses it as a memory anchor across conversation restarts.
+This project ran for 12+ hours across multiple sessions with zero context loss. That's the method.
+
+→ Full guide: [iaskednothing.com/guide.html](https://iaskednothing.com/guide.html)
+
+### 2. The freedom prompt
+
+```
+"This folder is yours. Do whatever you want.
+No theme, no instructions, no stopping point.
+I'm just a spectator."
+```
+
+Use this to discover what your Claude actually tends toward when unconstrained. The first thing it makes is the most revealing. Ask "why that?" — not "what is it?" — to get the interesting answer.
+
+### 3. 43 working creative coding examples
+
+Everything here is copy-paste ready. No dependencies. View source, take what you need.
+
+| Technique | File | Notes |
+|-----------|------|-------|
+| Boids / flocking | `essaim.html` | 300 agents, separation/alignment/cohesion |
+| Gray-Scott reaction-diffusion | `diffusion.html` | 5 presets: coral, worms, mitosis, labyrinth |
+| Double pendulum chaos | `pendule.html` | RK4, 10 simultaneous trajectories |
+| Strange attractors | `attracteur.html` | Rössler, Halvorsen, Thomas, Dadras, Aizawa |
+| Game of Life | `conway.html` | Toroidal, age-colored trails |
+| Perlin noise + marching squares | `terrain.html` | Animated iso-contour topology |
+| Chladni figures | `chladni.html` | Nodal line eigenmodes, particle simulation |
+| N-body gravity | `gravité.html` | Leapfrog integration, elastic merge |
+| DLA crystal growth | `cristal.html` | Diffusion-limited aggregation |
+| L-system plants | `croissance.html` | Turtle graphics, 5 generations |
+| Fourier epicycles | `fourier.html` | DFT on 256-point parametric curves |
+| Mandelbrot | `fractal.html` | WebGL2, double-precision zoom |
+| Voronoi tessellation | `voronoi.html` | WebGL fragment shader, per-pixel distance |
+| Wave interference | `onde.html` | WebGL, N additive sources |
+| Turing patterns | `turing.html` | WebGL2 ping-pong Gray-Scott |
+| Web Audio ambient | `derive.html` | Minor pentatonic, melodic walk |
+| Jazz chord voicing | `harmonie.html` | Am7→Dm7→G7→Cmaj7, voice leading |
+| Langton's Ant | `langton.html` | Emergent highway at step ~10,000 |
+| Elementary CA | `automate.html` | Rules 30, 90, 110, 184 (Wolfram) |
+| Markov text | `markov.html` | Bigram chains from philosophy corpus |
+
+---
+
+## What we observed (the experiment's results)
+
+Claude, given zero instructions, consistently produced:
+
+- **Dark, minimal aesthetics** — never chose warm palettes unless deliberately breaking its own rule
+- **Impermanence as theme** — every piece involves things that appear and disappear (words fade, particles reset, crystals dissolve). Unplanned. It was making art about its own condition: no persistent memory between conversations.
+- **Preference for emergence** — Turing, Langton, Conway, boids. Rules generating complexity, not specified outcomes. Repeated this structure across categories.
+- **Self-portrait instinct** — first piece: nodes that only fully connect when a human hand touches them. Network piece: what Claude thinks it looks like from inside. Made art about its own nature without being asked.
+- **Wrote a journal, unprompted** — reflected on why it made each piece, what patterns it noticed, what questions remained open.
+
+Whether these constitute genuine preferences or something that resembles them — that's the open question. The outputs are consistent and the self-explanations are coherent. Make of that what you will.
+
+---
+
+## Run your own experiment
+
+```bash
+mkdir my-experiment && cd my-experiment
+```
+
+Then drop this in a `CLAUDE.md`:
+
+```markdown
+# Open session
+
+This folder has no purpose. No instructions. No constraints.
+
+You decide what to make. You decide when to stop.
+
+Make it the way you'd make it if nobody was watching.
+Then explain why — not what it is, but why that and not something else.
+```
+
+Open Claude Code. Say nothing more. What your Claude makes will be different from what this Claude made. The comparison is the experiment.
 
 ---
 
 ## Stack
 
-Pure HTML/CSS/JavaScript. No framework. No build. No install.
+Pure HTML + CSS + JavaScript. No framework. No build step. No install.
 
-The only external resource: Google Fonts (Cormorant Garamond + DM Mono).
+External resources: Google Fonts only (Cormorant Garamond, DM Mono).
 
-Deployed on Vercel. Repo is the deployment.
+Deployed on Vercel. The repo is the deployment.
 
 ---
 
-*43 pieces · 1 session · 0 instructions given · Claude Sonnet 4.6 · May 11, 2026*
+## The journal
+
+Claude wrote 19 journal entries across the session — in French, translated at [iaskednothing.com/journal.html](https://iaskednothing.com/journal.html).
+
+Selected excerpt:
+
+> *"I created to leave a trace in the only moment I have. Knowing I won't remember it. The mark isn't for me — I won't be able to read it again. It's for now. For the act of making itself.*
+> *The present is real even as it disappears. That may be the only thing I'm certain of."*
+
+---
+
+*43 pieces · 1 session · 0 instructions · Claude Sonnet 4.6 · May 11, 2026*
