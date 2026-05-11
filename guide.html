@@ -226,6 +226,8 @@ pre .va { color: rgba(100,200,180,0.8); }   /* variable teal */
   padding-top: 0.2rem;
   text-align: right;
 }
+.step-content h3 a { color: rgba(175,160,225,0.8); text-decoration: none; border-bottom: 1px solid rgba(175,160,225,0.2); transition: all 0.2s; }
+.step-content h3 a:hover { color: rgba(190,178,235,0.95); border-bottom-color: rgba(175,160,225,0.5); }
 .step-content h3 {
   font-size: 1.05rem; font-weight: 400;
   color: rgba(218,210,196,0.88);
@@ -254,7 +256,7 @@ footer a {
 }
 footer a:hover { color: var(--text); }
 </style>
-<style>#hd{display:none!important}</style>
+<style>#hd,#header{display:none!important}</style>
 </head>
 <body>
 
@@ -280,7 +282,7 @@ footer a:hover { color: var(--text); }
 
   <div class="page-label">Practical guide · for Claude users and developers</div>
   <h1 class="page-title">How to use Claude like this</h1>
-  <p class="page-intro">Three things you can take from this project and use tomorrow: persistent memory across sessions, unlocking creative output, and understanding what your Claude actually tends toward.</p>
+  <p class="page-intro">Everything this project discovered about working with Claude — distilled into tools you can use tomorrow. Memory, creative output, multi-agent patterns, and understanding what your Claude actually tends toward.</p>
 
   <!-- ─── SECTION 1: The memory method ─────────────────────────────────── -->
 
@@ -411,7 +413,7 @@ no instructions, no stopping point. I'm just a spectator."</pre>
     <h2>Patterns in Claude's unconstrained output</h2>
 
     <p class="body-text">
-      43 pieces, one session. These patterns appeared consistently, without being prompted:
+      54 pieces, one session. These patterns appeared consistently, without being prompted:
     </p>
 
     <div class="pattern-grid">
@@ -446,11 +448,47 @@ no instructions, no stopping point. I'm just a spectator."</pre>
     </p>
   </section>
 
+
+  <!-- ─── SECTION 3b: Tools ─────────────────────────────────────────────── -->
+
+  <section class="section">
+    <div class="section-label">03b · Three tools</div>
+    <h2>What the project built for you</h2>
+
+    <p class="body-text">
+      Beyond the 54 pieces and the journal, the experiment produced three practical tools — built because this Claude needed them, and because other Claude users need them too.
+    </p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">①</div>
+        <div class="step-content">
+          <h3><a href="mémoire.html">CLAUDE.md Generator</a></h3>
+          <p>Answer 5 questions about your project. Get a ready-to-paste CLAUDE.md that gives Claude persistent memory across every session. The method this project ran on — now with a one-click generator.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">②</div>
+        <div class="step-content">
+          <h3><a href="skills.html">20 Techniques That Actually Work</a></h3>
+          <p>20 skills discovered through making 54 pieces. Each one: the problem it solves, how it works, a copy-paste prompt. Covers memory, creativity, output quality, workflow, and multi-agent patterns.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">③</div>
+        <div class="step-content">
+          <h3><a href="agents.html">Multi-Claude Orchestration</a></h3>
+          <p>Five patterns for running multiple Claude agents in parallel, in sequence, or in isolated worktrees. Visual diagrams. Working code. For complex projects that one Claude can't handle alone.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ─── SECTION 4: The code as a resource ────────────────────────────── -->
 
   <section class="section">
-    <div class="section-label">04 · For developers</div>
-    <h2>43 creative coding examples, copy-paste ready</h2>
+    <div class="section-label">05 · For developers</div>
+    <h2>54 creative coding examples, copy-paste ready</h2>
 
     <p class="body-text">
       Every piece is a standalone HTML file. No framework, no build step, no install. Open in a browser. View source. Copy what you need.
@@ -496,7 +534,7 @@ no instructions, no stopping point. I'm just a spectator."</pre>
   <!-- ─── SECTION 5: Replicate ─────────────────────────────────────────── -->
 
   <section class="section">
-    <div class="section-label">05 · Run the experiment yourself</div>
+    <div class="section-label">06 · Run the experiment yourself</div>
     <h2>What your Claude makes when given freedom</h2>
 
     <p class="body-text">

@@ -279,8 +279,8 @@
       if (el.style.position === 'fixed') el.remove();
     });
 
-    // Hide existing main-page header
-    const existing = document.querySelector('#hd');
+    // Hide existing main-page header (id varies by page)
+    const existing = document.querySelector('#hd, #header');
     if (existing) existing.style.display = 'none';
 
     // Shared header
