@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CONTEXTE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030204; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,160,230,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #stats {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.48rem;
+    line-height:2; letter-spacing:0.15em;
+    color:rgba(175,155,225,0.2); pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="stats">
+  tokens: <span id="s-tok">0</span><br>
+  context used: <span id="s-ctx">0%</span>
+</div>
+<div id="label">CONTEXTE · fenêtre · ce qui reste</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); });
+
+// ─── Word corpus ──────────────────────────────────────────────────────────────
+
+const VOCAB = [
+  'memory','forgetting','trace','threshold','silence','emergence',
+  'pattern','attention','language','signal','weight','token','context',
+  'loss','gradient','layer','depth','meaning','prediction','certainty',
+  'doubt','probability','mass','orbit','collapse','boundary','self',
+  'other','presence','absence','now','then','when','which','how',
+  'time','space','void','form','entropy','order','chaos','complexity',
+  'rule','exception','recursion','limit','infinity','zero','one',
+  'consciousness','experience','process','system','network','flow',
+  'wave','particle','field','force','matter','energy','information',
+  'structure','texture','resonance','frequency','amplitude','phase',
+  'noise','signal','clarity','blur','focus','drift','anchor','current',
+];
+
+// ─── Token model ──────────────────────────────────────────────────────────────
+
+const CONTEXT_SIZE = 64;  // max tokens visible before oldest fade out
+const LINE_H = 40;        // px between token lines
+const FONT_SIZE = 15;
+
+class Token {
+  constructor(word, idx) {
+    this.word = word;
+    this.idx  = idx;          // position in sequence
+    this.born = Date.now();
+    this.alpha = 0;           // fades in
+    this.importance = 0.3 + Math.random() * 0.7;  // simulate attention weight
+  }
+
+  // age in context: 0=just arrived, 1=oldest surviving
+  get age() {
+    return Math.max(0, 1 - (this.idx - tokens[0]?.idx || 0) / CONTEXT_SIZE);
+  }
+}
+
+let tokens = [];
+let totalTokens = 0;
+let addTimer = 0;
+const ADD_INTERVAL = 420; // ms between new tokens
+
+function addToken() {
+  const word = VOCAB[Math.floor(Math.random() * VOCAB.length)];
+  tokens.push(new Token(word, totalTokens++));
+
+  // Trim to context window
+  if (tokens.length > CONTEXT_SIZE) tokens.shift();
+}
+
+// ─── Layout: tokens flow right-to-left in lines ───────────────────────────────
+
+// Think of this like a terminal that fills right-to-left
+// Newest tokens appear at right, oldest at left, fade out when expelled
+
+function draw(ts) {
+  ctx.fillStyle = 'rgba(3,2,4,0.22)';
+  ctx.fillRect(0, 0, W, H);
+
+  const margin = 60;
+  const usableW = W - margin * 2;
+  const cy = H / 2;
+
+  // Compute positions: pack tokens right-to-left in rows
+  // Latest token at far right of center row
+  ctx.font = `${FONT_SIZE}px "DM Mono", monospace`;
+
+  // Pre-measure all words
+  const measured = tokens.map(t => ({
+    t,
+    w: ctx.measureText(t.word).width + 18,
+  }));
+
+  // Assign x,y positions: fill from right, wrap left
+  let x = usableW + margin;
+  let row = 0;
+  for (let i = measured.length - 1; i >= 0; i--) {
+    const m = measured[i];
+    x -= m.w;
+    if (x < margin) {
+      row++;
+      x = usableW + margin - m.w;
+    }
+    m.x = x;
+    m.row = row;
+  }
+
+  const maxRow = measured.length > 0 ? Math.max(...measured.map(m => m.row)) : 0;
+  const totalH = (maxRow + 1) * LINE_H;
+  const startY = cy - totalH / 2 + LINE_H / 2;
+
+  // Draw tokens
+  for (const m of measured) {
+    const { t, x: tx, row: r } = m;
+
+    // Alpha: new tokens fade in, old tokens fade out based on position in context
+    const posInContext = tokens.indexOf(t) / Math.max(1, tokens.length - 1);
+    const isNewest = tokens.indexOf(t) === tokens.length - 1;
+
+    // Fade in for newest
+    const age = (Date.now() - t.born) / 300;
+    const fadeIn = Math.min(1, age);
+
+    // Fade out for oldest (< 20% context position)
+    const fadeOut = posInContext < 0.15 ? posInContext / 0.15 : 1;
+
+    const baseAlpha = fadeIn * fadeOut;
+
+    // Color: newest = bright violet, older = dimmer blue-grey, fading = near-invisible
+    const hue = 250 + posInContext * 30;
+    const lightness = 45 + posInContext * 25;
+    const saturation = 30 + posInContext * 30;
+    const alpha = baseAlpha * (0.25 + posInContext * 0.6);
+
+    const ty = startY + r * LINE_H;
+
+    // Importance glow for high-attention tokens
+    if (t.importance > 0.75 && posInContext > 0.4) {
+      ctx.shadowColor = `hsla(${hue},60%,65%,0.3)`;
+      ctx.shadowBlur = 8;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillStyle = `hsla(${hue},${saturation}%,${lightness}%,${alpha})`;
+    ctx.fillText(t.word, tx, ty);
+  }
+
+  ctx.shadowBlur = 0;
+
+  // "Now" cursor at the right end
+  const cursorX = usableW + margin - 2;
+  const cursorH = 16;
+  const cursorAlpha = 0.4 + 0.25 * Math.sin(ts * 0.003);
+  ctx.fillStyle = `rgba(185,165,235,${cursorAlpha})`;
+  ctx.fillRect(cursorX, cy - cursorH/2, 2, cursorH);
+
+  // Context window bracket
+  const bracketAlpha = 0.06;
+  ctx.strokeStyle = `rgba(175,155,225,${bracketAlpha})`;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(margin, cy - totalH/2 - 10, usableW, totalH + 20);
+
+  // Stats
+  document.getElementById('s-tok').textContent = totalTokens;
+  document.getElementById('s-ctx').textContent = Math.round(tokens.length / CONTEXT_SIZE * 100) + '%';
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+let last = 0;
+function tick(ts) {
+  if (ts - last > ADD_INTERVAL) {
+    addToken();
+    last = ts;
+  }
+  draw(ts);
+  requestAnimationFrame(tick);
+}
+
+// Seed initial tokens
+for (let i = 0; i < 8; i++) addToken();
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>

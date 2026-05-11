@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PLASMA</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020204; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(160,120,200,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label">PLASMA · champ sinusoïdal · superposition</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+const SCALE = 4; // compute at reduced resolution, upscale
+let GW, GH;
+
+function resize() {
+  W = canvas.width  = innerWidth;
+  H = canvas.height = innerHeight;
+  GW = Math.ceil(W / SCALE);
+  GH = Math.ceil(H / SCALE);
+}
+resize();
+addEventListener('resize', resize);
+
+// ─── Plasma function ──────────────────────────────────────────────────────────
+
+// Classic plasma: sum of multiple sine waves with different frequencies/phases
+// v ∈ [0,1] → hue via palette
+
+// Slow-drift parameters
+const params = {
+  a1: 1.0, b1: 1.0, c1: 0.5,
+  a2: 0.5, b2: 1.5, c2: 0.3,
+  a3: 1.2, b3: 0.8, c3: 0.7,
+  a4: 0.8, b4: 1.2, c4: 0.4,
+};
+
+function plasma(x, y, t) {
+  const nx = x / GW, ny = y / GH;
+
+  const v1 = Math.sin(nx * 10 * params.a1 + t * params.c1);
+  const v2 = Math.sin(ny * 8  * params.b1 + t * 0.7);
+  const v3 = Math.sin((nx * 6 + ny * 6) * params.a2 + t * params.c2);
+
+  // Circular waves
+  const cx1 = 0.5 + 0.3 * Math.sin(t * 0.3);
+  const cy1 = 0.5 + 0.3 * Math.cos(t * 0.4);
+  const d1  = Math.sqrt((nx-cx1)**2 + (ny-cy1)**2);
+  const v4  = Math.sin(d1 * 18 - t * params.c3);
+
+  const cx2 = 0.3 + 0.2 * Math.cos(t * 0.2);
+  const cy2 = 0.3 + 0.2 * Math.sin(t * 0.25);
+  const d2  = Math.sqrt((nx-cx2)**2 + (ny-cy2)**2);
+  const v5  = Math.sin(d2 * 14 + t * 0.5);
+
+  return (v1 + v2 + v3 + v4 + v5) / 5; // ∈ [-1, 1]
+}
+
+// Palette: cooler purple/indigo/blue, avoiding warm colors
+// maps v∈[-1,1] → rgba
+function palette(v) {
+  const t = (v + 1) / 2; // 0..1
+
+  // Multiple palette zones:
+  let r, g, b;
+  if (t < 0.25) {
+    // deep indigo
+    const s = t / 0.25;
+    r = Math.floor(10 + s * 30);
+    g = Math.floor(5  + s * 20);
+    b = Math.floor(40 + s * 80);
+  } else if (t < 0.5) {
+    // violet
+    const s = (t - 0.25) / 0.25;
+    r = Math.floor(40  + s * 100);
+    g = Math.floor(25  + s * 10);
+    b = Math.floor(120 + s * 80);
+  } else if (t < 0.75) {
+    // cyan/teal
+    const s = (t - 0.5) / 0.25;
+    r = Math.floor(20  + s * 20);
+    g = Math.floor(100 + s * 100);
+    b = Math.floor(160 + s * 40);
+  } else {
+    // back to violet
+    const s = (t - 0.75) / 0.25;
+    r = Math.floor(40  + s * 60);
+    g = Math.floor(200 - s * 170);
+    b = Math.floor(200 - s * 60);
+  }
+
+  return [r, g, b];
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+let off;
+function ensureOff() {
+  if (!off || off.width !== GW || off.height !== GH) {
+    off = new OffscreenCanvas(GW, GH);
+  }
+}
+
+let t = 0;
+const SPEED = 0.008;
+
+function tick() {
+  t += SPEED;
+
+  ensureOff();
+  const octx = off.getContext('2d');
+  const img = octx.createImageData(GW, GH);
+  const d = img.data;
+
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      const v = plasma(x, y, t);
+      const [r, g, b] = palette(v);
+      const i = (y * GW + x) * 4;
+      d[i]   = r;
+      d[i+1] = g;
+      d[i+2] = b;
+      d[i+3] = 255;
+    }
+  }
+
+  octx.putImageData(img, 0, 0);
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(off, 0, 0, W, H);
+
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>

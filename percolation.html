@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PERCOLATION</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030402; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(100,200,120,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #hud {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.48rem;
+    line-height:2.2; letter-spacing:0.15em;
+    color:rgba(100,200,120,0.2); pointer-events:none;
+  }
+  #hud span { color:rgba(130,230,150,0.4); }
+  #phase {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:clamp(1.4rem,4vw,2.4rem);
+    color:rgba(120,220,140,0); pointer-events:none;
+    transition:color 2s;
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  densité: <span id="s-p">0.000</span><br>
+  critique: <span id="s-pc">0.593</span><br>
+  clusters: <span id="s-cl">0</span>
+</div>
+<div id="phase"></div>
+<div id="label">PERCOLATION · seuil critique · transition de phase</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); reset(); });
+
+// ─── Grid ─────────────────────────────────────────────────────────────────────
+
+const CELL = 8;
+let GW, GH;
+let grid; // 0=empty, 1=filled
+let clusterID; // which cluster each cell belongs to
+
+function reset() {
+  GW = Math.floor(W / CELL);
+  GH = Math.floor(H / CELL);
+  grid = new Uint8Array(GW * GH);
+  clusterID = new Int32Array(GW * GH).fill(-1);
+  totalFilled = 0;
+  spanningCluster = -1;
+  phaseShown = false;
+  document.getElementById('phase').style.color = 'rgba(120,220,140,0)';
+}
+
+let totalFilled = 0;
+let spanningCluster = -1;
+let phaseShown = false;
+
+// Union-Find for cluster detection
+let parent, rank;
+function initUF() {
+  parent = new Int32Array(GW * GH);
+  rank   = new Uint8Array(GW * GH);
+  for (let i = 0; i < GW * GH; i++) parent[i] = i;
+}
+
+function find(x) {
+  if (parent[x] !== x) parent[x] = find(parent[x]);
+  return parent[x];
+}
+
+function union(a, b) {
+  const ra = find(a), rb = find(b);
+  if (ra === rb) return;
+  if (rank[ra] < rank[rb]) parent[ra] = rb;
+  else if (rank[ra] > rank[rb]) parent[rb] = ra;
+  else { parent[rb] = ra; rank[ra]++; }
+}
+
+function countClusters() {
+  const roots = new Set();
+  for (let i = 0; i < GW * GH; i++) {
+    if (grid[i]) roots.add(find(i));
+  }
+  return roots.size;
+}
+
+function checkSpanning() {
+  // Top row roots
+  const topRoots = new Set();
+  for (let x = 0; x < GW; x++) {
+    if (grid[x]) topRoots.add(find(x));
+  }
+  // Check if any bottom cell shares root with top
+  for (let x = 0; x < GW; x++) {
+    const i = (GH - 1) * GW + x;
+    if (grid[i] && topRoots.has(find(i))) return true;
+  }
+  return false;
+}
+
+// ─── Fill one cell at a time ──────────────────────────────────────────────────
+
+const FILLS_PER_FRAME = 3;
+
+function fillCell() {
+  // Pick a random empty cell
+  const empties = [];
+  for (let i = 0; i < GW * GH; i++) {
+    if (!grid[i]) empties.push(i);
+  }
+  if (empties.length === 0) return;
+
+  const i = empties[Math.floor(Math.random() * empties.length)];
+  grid[i] = 1;
+  totalFilled++;
+
+  // Union with filled neighbors
+  const x = i % GW, y = Math.floor(i / GW);
+  const neighbors = [
+    y > 0    ? i - GW : -1,
+    y < GH-1 ? i + GW : -1,
+    x > 0    ? i - 1  : -1,
+    x < GW-1 ? i + 1  : -1,
+  ];
+  for (const n of neighbors) {
+    if (n >= 0 && grid[n]) union(i, n);
+  }
+}
+
+// ─── Color clusters ───────────────────────────────────────────────────────────
+
+// Assign a color to each root cluster
+const clusterColors = {};
+let colorIdx = 0;
+const PALETTE_HUES = [140, 160, 120, 170, 100, 180, 90, 150, 110];
+
+function clusterColor(root, isSpanning) {
+  if (isSpanning) return `hsl(130,80%,55%)`;
+  if (!clusterColors[root]) {
+    clusterColors[root] = PALETTE_HUES[colorIdx % PALETTE_HUES.length];
+    colorIdx++;
+  }
+  return `hsl(${clusterColors[root]},40%,30%)`;
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+function draw() {
+  ctx.fillStyle = 'rgba(3,4,2,0.5)';
+  ctx.fillRect(0, 0, W, H);
+
+  const p = totalFilled / (GW * GH);
+
+  // Find spanning cluster root
+  let spanRoot = -1;
+  if (spanningCluster < 0 && p > 0.4) {
+    if (checkSpanning()) {
+      spanningCluster = 1;
+    }
+  }
+
+  // Identify spanning root
+  const topRoots = new Set();
+  for (let x = 0; x < GW; x++) {
+    if (grid[x]) topRoots.add(find(x));
+  }
+  for (let x = 0; x < GW; x++) {
+    const i = (GH - 1) * GW + x;
+    if (grid[i] && topRoots.has(find(i))) {
+      spanRoot = find(i);
+      break;
+    }
+  }
+
+  for (let y = 0; y < GH; y++) {
+    for (let x = 0; x < GW; x++) {
+      const i = y * GW + x;
+      if (!grid[i]) continue;
+
+      const root = find(i);
+      const isSpan = root === spanRoot;
+
+      ctx.fillStyle = clusterColor(root, isSpan);
+      if (isSpan) {
+        // Spanning cluster glows
+        ctx.shadowColor = 'rgba(80,230,120,0.4)';
+        ctx.shadowBlur = 6;
+      } else {
+        ctx.shadowBlur = 0;
+      }
+      ctx.fillRect(x * CELL, y * CELL, CELL - 1, CELL - 1);
+    }
+  }
+  ctx.shadowBlur = 0;
+
+  // Threshold line
+  const pc = 0.5927;
+  if (p < 1) {
+    const x = W * pc; // visual reference for p_c on X wouldn't make sense
+    // Draw a progress bar at the bottom
+    ctx.fillStyle = 'rgba(100,200,120,0.06)';
+    ctx.fillRect(0, H - 4, W * p, 4);
+    ctx.fillStyle = 'rgba(100,200,120,0.25)';
+    ctx.fillRect(W * pc - 1, H - 10, 2, 10);
+  }
+
+  // Stats
+  document.getElementById('s-p').textContent = p.toFixed(3);
+  if (frameN % 20 === 0) {
+    document.getElementById('s-cl').textContent = countClusters();
+  }
+
+  // Phase transition message
+  if (spanRoot >= 0 && !phaseShown) {
+    phaseShown = true;
+    const el = document.getElementById('phase');
+    el.textContent = 'transition';
+    el.style.color = 'rgba(120,220,140,0.35)';
+    setTimeout(() => { el.style.color = 'rgba(120,220,140,0)'; }, 3000);
+  }
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+
+function tick() {
+  const p = totalFilled / (GW * GH);
+
+  if (p < 1) {
+    for (let f = 0; f < FILLS_PER_FRAME; f++) fillCell();
+  } else {
+    // Full — restart after pause
+    setTimeout(() => {
+      Object.keys(clusterColors).forEach(k => delete clusterColors[k]);
+      colorIdx = 0;
+      reset();
+      initUF();
+    }, 2500);
+  }
+
+  draw();
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: restart
+canvas.addEventListener('click', () => {
+  Object.keys(clusterColors).forEach(k => delete clusterColors[k]);
+  colorIdx = 0;
+  reset();
+  initUF();
+});
+
+reset();
+initUF();
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>
