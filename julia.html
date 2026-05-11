@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JULIA</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030203; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(200,140,200,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #cval {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1rem; color:rgba(200,140,210,0.2);
+    letter-spacing:0.05em; pointer-events:none;
+    transition: color 1.5s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="cval"></div>
+<div id="label">JULIA · z → z² + c · ensemble de Julia</div>
+
+<script>
+const canvas = document.getElementById('c');
+let gl, prog, uRes, uC, uZoom, uCenter;
+let W, H;
+
+function resize() {
+  W = canvas.width  = innerWidth;
+  H = canvas.height = innerHeight;
+  gl.viewport(0, 0, W, H);
+}
+
+// ─── WebGL setup ──────────────────────────────────────────────────────────────
+
+gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+if (!gl) {
+  document.body.innerHTML = '<p style="color:#fff;padding:2rem">WebGL not available</p>';
+  throw new Error('no webgl');
+}
+
+const VS = `#version 300 es
+in vec2 position;
+void main() { gl_Position = vec4(position, 0, 1); }
+`;
+
+const FS = `#version 300 es
+precision highp float;
+uniform vec2 u_res;
+uniform vec2 u_c;
+uniform float u_zoom;
+uniform vec2 u_center;
+out vec4 color;
+
+vec3 palette(float t) {
+  // Smooth cool palette: dark purple → violet → magenta → white
+  vec3 a = vec3(0.05, 0.02, 0.08);
+  vec3 b = vec3(0.5, 0.3, 0.6);
+  vec3 c = vec3(0.8, 0.6, 0.9);
+  vec3 d = vec3(0.0, 0.1, 0.5);
+  return a + b * cos(6.28318 * (c * t + d));
+}
+
+void main() {
+  vec2 uv = (gl_FragCoord.xy - u_res * 0.5) / min(u_res.x, u_res.y);
+  vec2 z = uv * u_zoom * 3.5 + u_center;
+
+  const int MAX_ITER = 256;
+  int i = 0;
+  float smooth_i = 0.0;
+
+  for (int n = 0; n < MAX_ITER; n++) {
+    if (dot(z, z) > 4.0) { i = n; break; }
+    z = vec2(z.x*z.x - z.y*z.y + u_c.x, 2.0*z.x*z.y + u_c.y);
+    i = n;
+  }
+
+  if (i == MAX_ITER - 1) {
+    color = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
+
+  float t = float(i) / float(MAX_ITER);
+  t = sqrt(t);
+  color = vec4(palette(t), 1.0);
+}
+`;
+
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  return s;
+}
+
+prog = gl.createProgram();
+gl.attachShader(prog, compile(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compile(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,1,-1,-1,1,1,1]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(prog, 'position');
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+uRes    = gl.getUniformLocation(prog, 'u_res');
+uC      = gl.getUniformLocation(prog, 'u_c');
+uZoom   = gl.getUniformLocation(prog, 'u_zoom');
+uCenter = gl.getUniformLocation(prog, 'u_center');
+
+resize();
+addEventListener('resize', resize);
+
+// ─── Julia set parameters ─────────────────────────────────────────────────────
+
+const PARAMS = [
+  { cr: -0.70176, ci:  0.3842,  name: 'c = −0.702 + 0.384i' },
+  { cr: -0.4,     ci:  0.6,     name: 'c = −0.4 + 0.6i' },
+  { cr:  0.285,   ci:  0.01,    name: 'c = 0.285 + 0.01i' },
+  { cr: -0.835,   ci: -0.2321,  name: 'c = −0.835 − 0.232i' },
+  { cr: -0.7269,  ci:  0.1889,  name: 'c = −0.727 + 0.189i' },
+  { cr:  0.0,     ci: -0.8,     name: 'c = −0.8i' },
+  { cr: -0.1,     ci:  0.651,   name: 'c = −0.1 + 0.651i' },
+  { cr:  0.37,    ci:  0.1,     name: 'c = 0.37 + 0.1i' },
+];
+
+let paramIdx = 0;
+let currentC = { cr: PARAMS[0].cr, ci: PARAMS[0].ci };
+let targetC  = { cr: PARAMS[0].cr, ci: PARAMS[0].ci };
+let blendT   = 1;
+let holdTimer = 0;
+const HOLD_FRAMES = 280;
+
+function nextParam() {
+  paramIdx = (paramIdx + 1) % PARAMS.length;
+  targetC = PARAMS[paramIdx];
+  blendT  = 0;
+  holdTimer = 0;
+  document.getElementById('cval').textContent = PARAMS[paramIdx].name;
+}
+
+nextParam();
+nextParam(); // start at 1
+
+// Slow zoom in/out breathing
+let zoom    = 1.0;
+let zoomDir = -1;
+const ZOOM_MIN = 0.6, ZOOM_MAX = 1.2;
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+
+function tick() {
+  // Smooth transition between c values
+  if (blendT < 1) {
+    blendT = Math.min(1, blendT + 0.004);
+    const t = blendT < 0.5 ? 2*blendT*blendT : -1+(4-2*blendT)*blendT; // ease
+    currentC.cr = currentC.cr + (targetC.cr - currentC.cr) * 0.015;
+    currentC.ci = currentC.ci + (targetC.ci - currentC.ci) * 0.015;
+  }
+
+  holdTimer++;
+  if (holdTimer > HOLD_FRAMES) nextParam();
+
+  // Breathing zoom
+  zoom += zoomDir * 0.0008;
+  if (zoom < ZOOM_MIN || zoom > ZOOM_MAX) zoomDir *= -1;
+
+  gl.uniform2f(uRes,    W, H);
+  gl.uniform2f(uC,      currentC.cr, currentC.ci);
+  gl.uniform1f(uZoom,   zoom);
+  gl.uniform2f(uCenter, 0, 0);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: jump to next
+canvas.addEventListener('click', nextParam);
+
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>

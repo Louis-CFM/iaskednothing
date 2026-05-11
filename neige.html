@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEIGE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020308; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(160,195,230,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #params {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:0.9rem; color:rgba(160,195,230,0.18);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="params"></div>
+<div id="label">NEIGE · Reiter 1005 · flocon de neige</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy;
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W / 2; cy = H / 2;
+}
+resize(); addEventListener('resize', () => { resize(); init(); });
+
+// ─── Reiter snowflake model ───────────────────────────────────────────────────
+// Hex grid using offset coordinates
+// Each cell has water vapor/ice content
+
+const SIZE = 120;  // half-radius of grid (cells)
+const N = SIZE * 2 + 1;
+
+// Axial hex directions (pointy-top)
+const HEX_DIRS = [[1,0],[-1,0],[0,1],[0,-1],[1,-1],[-1,1]];
+
+let a, b; // a = current state, b = next state
+let frozen;
+
+// Parameters (Reiter's model)
+// Different combos produce different flake shapes
+const PRESETS = [
+  { alpha: 1, beta: 0.35, gamma: 0.001, name: 'classique' },
+  { alpha: 1, beta: 0.40, gamma: 0.0001,name: 'dendritique' },
+  { alpha: 1, beta: 0.28, gamma: 0.005, name: 'compact' },
+  { alpha: 1, beta: 0.50, gamma: 0.002, name: 'stellaire' },
+];
+let presetIdx = 0;
+let preset = PRESETS[0];
+
+function idx(q, r) {
+  // q,r are axial coords, offset to [0,N)
+  return (r + SIZE) * N + (q + SIZE);
+}
+
+function inBounds(q, r) {
+  return q + SIZE >= 0 && q + SIZE < N && r + SIZE >= 0 && r + SIZE < N;
+}
+
+function init() {
+  preset = PRESETS[presetIdx % PRESETS.length];
+  presetIdx++;
+  document.getElementById('params').textContent =
+    `β=${preset.beta} · γ=${preset.gamma} · ${preset.name}`;
+
+  const len = N * N;
+  a      = new Float32Array(len).fill(preset.beta);
+  b      = new Float32Array(len);
+  frozen = new Uint8Array(len);
+
+  // Seed center cell
+  const ci = idx(0, 0);
+  a[ci] = 1.0;
+  frozen[ci] = 1;
+}
+
+// One Reiter step
+function step() {
+  const { alpha, beta, gamma } = preset;
+
+  for (let r = -SIZE; r <= SIZE; r++) {
+    for (let q = -SIZE; q <= SIZE; q++) {
+      if (!inBounds(q, r)) continue;
+      const i = idx(q, r);
+
+      if (frozen[i]) {
+        b[i] = a[i]; // frozen cells unchanged
+        continue;
+      }
+
+      // Is this cell receptive (adjacent to frozen)?
+      let receptive = false;
+      for (const [dq, dr] of HEX_DIRS) {
+        const nq = q + dq, nr = r + dr;
+        if (inBounds(nq, nr) && frozen[idx(nq, nr)]) {
+          receptive = true; break;
+        }
+      }
+
+      if (receptive) {
+        // Receptive: accumulate vapor
+        b[i] = a[i] + gamma;
+        if (b[i] >= 1) {
+          b[i] = 1;
+          frozen[i] = 1;
+        }
+      } else {
+        // Non-receptive: diffuse
+        let sum = a[i];
+        let count = 1;
+        for (const [dq, dr] of HEX_DIRS) {
+          const nq = q + dq, nr = r + dr;
+          if (inBounds(nq, nr) && !frozen[idx(nq, nr)]) {
+            sum += a[idx(nq, nr)];
+            count++;
+          }
+        }
+        b[i] = sum / count;
+      }
+    }
+  }
+
+  // Swap
+  const tmp = a; a = b; b = tmp;
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+// Hex to pixel (pointy-top, centered)
+function hexToPixel(q, r, cellSize) {
+  const x = cellSize * (Math.sqrt(3) * q + Math.sqrt(3)/2 * r);
+  const y = cellSize * (3/2 * r);
+  return { x: cx + x, y: cy + y };
+}
+
+let cellSize;
+let frameN = 0;
+let done = false;
+let doneAt = -1;
+
+function draw() {
+  ctx.fillStyle = 'rgba(2,3,8,0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Auto-compute cell size to fit
+  cellSize = Math.min(W, H) / (SIZE * 2.4);
+
+  // Draw frozen cells
+  for (let r = -SIZE; r <= SIZE; r++) {
+    for (let q = -SIZE; q <= SIZE; q++) {
+      if (!inBounds(q, r)) continue;
+      const i = idx(q, r);
+      if (!frozen[i] && a[i] < 0.02) continue;
+
+      const { x, y } = hexToPixel(q, r, cellSize);
+      const dist = Math.max(Math.abs(q), Math.abs(r), Math.abs(q+r));
+
+      if (frozen[i]) {
+        // Color by distance from center (depth of growth)
+        const t = dist / SIZE;
+        const lightness = 70 + t * 25;
+        ctx.fillStyle = `hsl(200, 50%, ${lightness}%)`;
+        ctx.globalAlpha = 0.75 + t * 0.2;
+      } else {
+        const v = Math.min(1, a[i] / 1);
+        ctx.fillStyle = `rgba(100,150,220,${v * 0.3})`;
+        ctx.globalAlpha = 1;
+      }
+
+      // Draw hex
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) {
+        const angle = Math.PI / 180 * (60 * k + 30);
+        const hx = x + cellSize * 0.92 * Math.cos(angle);
+        const hy = y + cellSize * 0.92 * Math.sin(angle);
+        if (k === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+const STEPS_PER_FRAME = 2;
+
+function tick() {
+  if (!done) {
+    for (let s = 0; s < STEPS_PER_FRAME; s++) step();
+  }
+
+  draw();
+
+  // Check if flake reached edge
+  if (!done) {
+    let edgeReached = false;
+    for (const [dq, dr] of [[SIZE,0],[-SIZE,0],[0,SIZE],[0,-SIZE],[SIZE,-SIZE],[-SIZE,SIZE]]) {
+      if (inBounds(dq, dr) && frozen[idx(dq, dr)]) { edgeReached = true; break; }
+    }
+    if (edgeReached) { done = true; doneAt = frameN; }
+  }
+
+  // Auto-restart after completion
+  if (done && frameN - doneAt > 200) {
+    done = false;
+    init();
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: new flake
+canvas.addEventListener('click', () => { done = false; init(); });
+
+init();
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>

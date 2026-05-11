@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CORDE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030304; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(200,170,100,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #harmonic {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1rem; color:rgba(210,180,110,0.2);
+    letter-spacing:0.05em; pointer-events:none;
+    transition: color 1s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="harmonic"></div>
+<div id="label">CORDE · ondes stationnaires · harmoniques</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ─── Standing waves ───────────────────────────────────────────────────────────
+
+// A string fixed at both ends vibrates in harmonics:
+// y(x,t) = A * sin(n*π*x/L) * cos(2π*f*t)
+// where n = harmonic number (1=fundamental, 2=first overtone...)
+
+const HARMONIC_NAMES = [
+  '', 'fundamental', '2nd harmonic', '3rd harmonic',
+  '4th harmonic', '5th harmonic', '6th harmonic',
+  '7th harmonic', '8th harmonic'
+];
+
+// Show multiple harmonics simultaneously, stacked
+const SHOW = 6; // how many to show at once
+const POINTS = 400;
+
+let time = 0;
+const SPEED = 0.018;
+let frameN = 0;
+
+// Active harmonics: cycle them in/out
+let activeHarmonics = [1, 2, 3, 4, 5, 6];
+let harmonicAlphas  = [1, 0.7, 0.55, 0.42, 0.32, 0.24];
+let harmonicPhases  = [0, 0.3, 0.7, 1.1, 1.6, 2.0]; // different phases for interest
+
+// Colors: warm amber gradient
+function harmonicColor(n, alpha) {
+  const hue = 38 + n * 8; // amber → yellow
+  const sat = 70 - n * 4;
+  const lit  = 62 + n * 4;
+  return `hsla(${hue},${sat}%,${lit}%,${alpha})`;
+}
+
+function drawString(n, phase, baseY, spread, alpha) {
+  const L = W * 0.75;
+  const startX = (W - L) / 2;
+  const A = spread * 0.9 * (1 / n); // amplitude decreases with harmonic
+
+  ctx.beginPath();
+  for (let i = 0; i <= POINTS; i++) {
+    const x = startX + i / POINTS * L;
+    const xNorm = i / POINTS; // 0..1
+    const y = baseY + A * Math.sin(n * Math.PI * xNorm) * Math.cos(time * n + phase);
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+
+  ctx.strokeStyle = harmonicColor(n, alpha);
+  ctx.lineWidth = 1.5 / n + 0.3;
+  ctx.shadowColor = harmonicColor(n, alpha * 0.4);
+  ctx.shadowBlur = 8 / n;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawStringFixed(x, y, height) {
+  // Draw fixed-point markers (nodes at ends)
+  ctx.beginPath();
+  ctx.arc(x, y, 4, 0, Math.PI*2);
+  ctx.fillStyle = 'rgba(200,170,100,0.3)';
+  ctx.fill();
+}
+
+// Superposition: sum of all active harmonics
+function drawSuperposition(baseY, spread) {
+  const L = W * 0.75;
+  const startX = (W - L) / 2;
+
+  ctx.beginPath();
+  for (let i = 0; i <= POINTS; i++) {
+    const x = startX + i / POINTS * L;
+    const xNorm = i / POINTS;
+
+    let y = 0;
+    activeHarmonics.forEach((n, idx) => {
+      const A = spread * 0.35 * (1 / n);
+      y += A * Math.sin(n * Math.PI * xNorm) * Math.cos(time * n + harmonicPhases[idx]);
+    });
+
+    if (i === 0) ctx.moveTo(x, baseY + y); else ctx.lineTo(x, baseY + y);
+  }
+
+  ctx.strokeStyle = 'rgba(240,210,140,0.65)';
+  ctx.lineWidth = 1.8;
+  ctx.shadowColor = 'rgba(230,200,120,0.3)';
+  ctx.shadowBlur = 12;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function draw() {
+  ctx.fillStyle = 'rgba(3,3,4,0.25)';
+  ctx.fillRect(0, 0, W, H);
+
+  const margin = H * 0.08;
+  const usableH = H - margin * 2;
+  const slotH = usableH / (SHOW + 1.5);
+
+  const L = W * 0.75;
+  const startX = (W - L) / 2;
+  const endX = startX + L;
+
+  // Draw individual harmonics
+  activeHarmonics.forEach((n, i) => {
+    const baseY = margin + i * slotH;
+    const spread = slotH * 0.38;
+    drawString(n, harmonicPhases[i], baseY, spread, harmonicAlphas[i]);
+    drawStringFixed(startX, baseY, spread);
+    drawStringFixed(endX, baseY, spread);
+
+    // Label
+    ctx.font = '10px "DM Mono", monospace';
+    ctx.fillStyle = `rgba(200,170,100,${harmonicAlphas[i] * 0.4})`;
+    ctx.fillText(`n=${n}`, startX - 32, baseY + 4);
+  });
+
+  // Superposition at bottom
+  const superY = margin + SHOW * slotH;
+  const superSpread = slotH * 0.45;
+
+  // Separator
+  ctx.strokeStyle = 'rgba(200,170,100,0.06)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 8]);
+  ctx.beginPath();
+  ctx.moveTo(startX, superY - slotH * 0.5);
+  ctx.lineTo(endX, superY - slotH * 0.5);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  drawSuperposition(superY, superSpread * 2);
+  drawStringFixed(startX, superY, superSpread);
+  drawStringFixed(endX, superY, superSpread);
+
+  ctx.font = '10px "DM Mono", monospace';
+  ctx.fillStyle = 'rgba(230,200,140,0.25)';
+  ctx.fillText('∑', startX - 24, superY + 4);
+
+  // Update harmonic label
+  if (frameN % 180 === 0) {
+    document.getElementById('harmonic').textContent =
+      `${SHOW} harmoniques · superposition`;
+  }
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+function tick() {
+  time += SPEED;
+  draw();
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: add/remove highest harmonic
+canvas.addEventListener('click', () => {
+  if (activeHarmonics.length < 8) {
+    const next = activeHarmonics[activeHarmonics.length - 1] + 1;
+    activeHarmonics.push(next);
+    harmonicAlphas.push(0.18);
+    harmonicPhases.push(Math.random() * Math.PI * 2);
+  } else {
+    activeHarmonics = [1, 2, 3, 4, 5, 6];
+    harmonicAlphas  = [1, 0.7, 0.55, 0.42, 0.32, 0.24];
+    harmonicPhases  = [0, 0.3, 0.7, 1.1, 1.6, 2.0];
+  }
+});
+
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>

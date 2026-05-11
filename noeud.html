@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NŒUD</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030304; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,220,240,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #name {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1rem; color:rgba(185,225,245,0.18);
+    pointer-events:none; transition:color 1s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="name"></div>
+<div id="label">NŒUD · topologie · courbes dans l'espace</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy;
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W/2; cy = H/2;
+}
+resize(); addEventListener('resize', resize);
+
+// ─── Knot definitions ─────────────────────────────────────────────────────────
+
+const KNOTS = [
+  {
+    name: 'trefoil · 3₁',
+    fn(t) {
+      return {
+        x: (2 + Math.cos(3*t)) * Math.cos(2*t),
+        y: (2 + Math.cos(3*t)) * Math.sin(2*t),
+        z: Math.sin(3*t)
+      };
+    },
+    scale: 0.16,
+    hue: 200,
+  },
+  {
+    name: 'figure-eight · 4₁',
+    fn(t) {
+      return {
+        x: (2 + Math.cos(2*t)) * Math.cos(3*t),
+        y: (2 + Math.cos(2*t)) * Math.sin(3*t),
+        z: Math.sin(4*t)
+      };
+    },
+    scale: 0.14,
+    hue: 280,
+  },
+  {
+    name: 'cinquefoil · 5₁',
+    fn(t) {
+      return {
+        x: (2 + Math.cos(5*t/2)) * Math.cos(t),
+        y: (2 + Math.cos(5*t/2)) * Math.sin(t),
+        z: Math.sin(5*t/2)
+      };
+    },
+    period: Math.PI * 4,
+    scale: 0.15,
+    hue: 160,
+  },
+  {
+    name: 'torus knot · 3₁ × 5',
+    fn(t) {
+      const p=3, q=5;
+      const r = Math.cos(q*t) + 2;
+      return {
+        x: r * Math.cos(p*t),
+        y: r * Math.sin(p*t),
+        z: -Math.sin(q*t)
+      };
+    },
+    scale: 0.13,
+    hue: 30,
+  },
+];
+
+let knotIdx = 0;
+let currentKnot = KNOTS[0];
+let rotX = 0.3, rotY = 0;
+let targetRotY = 0;
+let autoRotSpeed = 0.004;
+let tubeAlpha = 0;
+
+// ─── 3D projection ────────────────────────────────────────────────────────────
+
+function rotateX(p, a) {
+  return {
+    x: p.x,
+    y: p.y * Math.cos(a) - p.z * Math.sin(a),
+    z: p.y * Math.sin(a) + p.z * Math.cos(a),
+  };
+}
+function rotateY(p, a) {
+  return {
+    x: p.x * Math.cos(a) + p.z * Math.sin(a),
+    y: p.y,
+    z: -p.x * Math.sin(a) + p.z * Math.cos(a),
+  };
+}
+function project(p, scale) {
+  const fov = 5;
+  const z = p.z + fov;
+  return {
+    sx: cx + p.x / z * fov * Math.min(W,H) * scale,
+    sy: cy + p.y / z * fov * Math.min(W,H) * scale,
+    depth: z,
+  };
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+const SEGMENTS = 600;
+const TUBE_SEGS = 8;
+const TUBE_R = 0.06;
+
+function buildCurve(knot, rot) {
+  const period = knot.period || Math.PI * 2;
+  const pts = [];
+  for (let i = 0; i <= SEGMENTS; i++) {
+    const t = i / SEGMENTS * period;
+    let p = knot.fn(t);
+    p = rotateX(p, rot.rx);
+    p = rotateY(p, rot.ry);
+    const proj = project(p, knot.scale);
+    pts.push({ ...proj, orig: p });
+  }
+  return pts;
+}
+
+let frameN = 0;
+let knotTimer = 0;
+const KNOT_HOLD = 420;
+
+function draw() {
+  ctx.fillStyle = 'rgba(3,3,4,0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Auto-rotate
+  rotY += autoRotSpeed;
+  rotX += autoRotSpeed * 0.3;
+
+  knotTimer++;
+  if (knotTimer > KNOT_HOLD) {
+    knotIdx = (knotIdx + 1) % KNOTS.length;
+    currentKnot = KNOTS[knotIdx];
+    knotTimer = 0;
+    document.getElementById('name').textContent = currentKnot.name;
+    ctx.fillStyle = 'rgba(3,3,4,0.6)';
+    ctx.fillRect(0,0,W,H);
+  }
+
+  const pts = buildCurve(currentKnot, { rx: rotX, ry: rotY });
+
+  // Sort segments by depth for painter's algorithm
+  const segs = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    segs.push({
+      i,
+      depth: (pts[i].depth + pts[i+1].depth) / 2,
+    });
+  }
+  segs.sort((a, b) => b.depth - a.depth);
+
+  const hue = currentKnot.hue;
+
+  // Draw tube segments (simple: varying width + color by depth)
+  for (const { i, depth } of segs) {
+    const p0 = pts[i], p1 = pts[i+1];
+    const t = i / SEGMENTS;
+
+    const maxDepth = 7, minDepth = 3;
+    const d = (depth - minDepth) / (maxDepth - minDepth);
+    const w = 1.5 + (1 - d) * 4; // wider when closer
+    const lightness = 35 + (1-d) * 40;
+    const alpha = 0.4 + (1-d) * 0.5;
+
+    // Color shifts slightly along the tube
+    const hueShift = t * 60;
+
+    ctx.beginPath();
+    ctx.moveTo(p0.sx, p0.sy);
+    ctx.lineTo(p1.sx, p1.sy);
+    ctx.strokeStyle = `hsla(${hue + hueShift},60%,${lightness}%,${alpha})`;
+    ctx.lineWidth = w;
+    ctx.lineCap = 'round';
+
+    // Glow for front segments
+    if (d < 0.35) {
+      ctx.shadowColor = `hsla(${hue + hueShift},70%,70%,0.3)`;
+      ctx.shadowBlur = 8;
+    } else {
+      ctx.shadowBlur = 0;
+    }
+    ctx.stroke();
+  }
+  ctx.shadowBlur = 0;
+}
+
+function tick() {
+  draw();
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: next knot
+canvas.addEventListener('click', () => {
+  knotTimer = KNOT_HOLD;
+});
+
+document.getElementById('name').textContent = currentKnot.name;
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>
