@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>I asked nothing — what Claude made when given complete freedom</title>
-<meta name="description" content="I gave Claude an empty folder and complete freedom. No instructions. Here's what it made — 43 pieces and a journal.">
+<meta name="description" content="I gave Claude an empty folder and complete freedom. No instructions. Here's what it made — 50 pieces and a journal.">
 <meta property="og:title" content="I asked nothing">
 <meta property="og:description" content="I gave Claude an empty folder and said: do whatever you want. Here's what it made.">
 <meta property="og:type" content="website">
@@ -17,10 +17,13 @@
 :root {
   --bg:       #030207;
   --bg2:      #06060e;
-  --text:     rgba(220,214,200,0.88);
-  --muted:    rgba(155,147,132,0.45);
-  --accent:   rgba(175,160,225,1);
-  --border:   rgba(255,255,255,0.055);
+  --bg3:      #0a0914;
+  --text:     rgba(234,228,216,0.97);
+  --muted:    rgba(172,165,150,0.72);
+  --accent:   rgba(185,168,240,1);
+  --accent2:  rgba(100,200,160,1);
+  --border:   rgba(255,255,255,0.07);
+  --border2:  rgba(255,255,255,0.12);
   --header-h: 56px;
 }
 
@@ -39,8 +42,8 @@ body {
   height: var(--header-h);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 2rem;
-  background: rgba(3,2,7,0.85);
-  backdrop-filter: blur(12px);
+  background: rgba(3,2,7,0.92);
+  backdrop-filter: blur(14px);
   border-bottom: 1px solid var(--border);
   transition: background 0.3s;
 }
@@ -50,10 +53,10 @@ body {
   font-family: 'DM Mono', monospace;
   font-size: 0.75rem;
   letter-spacing: 0.05em;
-  color: rgba(200,193,180,0.6);
+  color: rgba(210,203,192,0.75);
   text-decoration: none;
 }
-.logo em { font-style: italic; color: rgba(175,160,225,0.55); }
+.logo em { font-style: italic; color: rgba(185,168,240,0.8); }
 
 .logo-mark {
   flex-shrink: 0;
@@ -62,12 +65,10 @@ body {
 }
 .logo-ring {
   fill: none;
-  stroke: rgba(175,160,225,0.38);
+  stroke: rgba(185,168,240,0.45);
   stroke-width: 1;
 }
-.logo-dot {
-  fill: rgba(185,170,235,0.75);
-}
+.logo-dot { fill: rgba(195,178,248,0.85); }
 @keyframes orbit {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
@@ -83,29 +84,29 @@ nav a {
   font-size: 0.55rem;
   letter-spacing: 0.25em;
   text-transform: uppercase;
-  color: rgba(155,147,132,0.5);
+  color: rgba(172,165,150,0.65);
   text-decoration: none;
   transition: color 0.2s;
 }
-nav a:hover { color: rgba(200,190,160,0.85); }
+nav a:hover { color: rgba(220,213,200,0.95); }
 
 .github-btn {
   display: flex; align-items: center; gap: 0.45rem;
   font-family: 'DM Mono', monospace; font-size: 0.5rem;
   letter-spacing: 0.14em; text-transform: uppercase;
-  color: rgba(140,133,120,0.4);
+  color: rgba(172,165,150,0.6);
   text-decoration: none;
-  border: 1px solid rgba(255,255,255,0.07);
+  border: 1px solid rgba(255,255,255,0.1);
   padding: 0.3rem 0.7rem;
   transition: all 0.2s;
 }
 .github-btn:hover {
-  color: rgba(195,188,174,0.75);
-  border-color: rgba(255,255,255,0.12);
+  color: rgba(220,213,200,0.9);
+  border-color: rgba(185,168,240,0.35);
 }
-.github-btn svg { opacity: 0.45; transition: opacity 0.2s; }
-.github-btn:hover svg { opacity: 0.75; }
-#star-count { color: rgba(175,160,225,0.55); }
+.github-btn svg { opacity: 0.55; transition: opacity 0.2s; }
+.github-btn:hover svg { opacity: 0.85; }
+#star-count { color: rgba(185,168,240,0.85); }
 
 /* ── HERO ────────────────────────────────────────────────────────────────── */
 
@@ -122,7 +123,7 @@ nav a:hover { color: rgba(200,190,160,0.85); }
 #hero canvas {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
-  opacity: 0.3;
+  opacity: 0.35;
 }
 
 #hero-content { position: relative; z-index: 2; max-width: 720px; }
@@ -138,15 +139,15 @@ nav a:hover { color: rgba(200,190,160,0.85); }
   font-size: clamp(3.5rem, 11vw, 7rem);
   font-weight: 300; line-height: 1.0;
   letter-spacing: -0.025em;
-  color: rgba(228,222,208,0.93);
+  color: rgba(242,236,224,1);
   margin-bottom: 1.6rem;
 }
-.h1 em { font-style: italic; color: rgba(175,160,225,0.7); }
+.h1 em { font-style: italic; color: rgba(195,178,248,1); }
 
 .hero-sub {
-  font-size: clamp(0.95rem,2vw,1.18rem);
+  font-size: clamp(1rem,2vw,1.22rem);
   font-style: italic; font-weight: 300;
-  color: rgba(155,147,132,0.6);
+  color: rgba(192,184,170,0.9);
   max-width: 44ch; margin: 0 auto 2.8rem;
   line-height: 1.65;
 }
@@ -162,33 +163,78 @@ nav a:hover { color: rgba(200,190,160,0.85); }
   display: inline-block;
 }
 .btn-primary {
-  color: rgba(175,160,225,0.75);
-  border-color: rgba(175,160,225,0.22);
+  color: rgba(195,178,248,1);
+  border-color: rgba(185,168,240,0.5);
+  background: rgba(185,168,240,0.06);
 }
 .btn-primary:hover {
-  color: rgba(195,182,238,0.95);
-  border-color: rgba(175,160,225,0.5);
-  background: rgba(175,160,225,0.05);
+  color: #fff;
+  border-color: rgba(185,168,240,0.9);
+  background: rgba(185,168,240,0.14);
 }
 .btn-ghost {
-  color: rgba(155,147,132,0.5);
-  border-color: rgba(255,255,255,0.07);
+  color: rgba(192,184,170,0.8);
+  border-color: rgba(255,255,255,0.14);
 }
 .btn-ghost:hover {
-  color: rgba(190,182,168,0.8);
-  border-color: rgba(255,255,255,0.15);
+  color: rgba(234,228,216,0.97);
+  border-color: rgba(255,255,255,0.28);
 }
 
 .scroll-hint {
   position: absolute; bottom: 2rem; left: 50%;
   transform: translateX(-50%);
   font-family: 'DM Mono', monospace; font-size: 0.45rem;
-  letter-spacing: 0.3em; color: rgba(120,113,100,0.2);
+  letter-spacing: 0.3em; color: rgba(140,133,120,0.3);
   text-transform: uppercase; animation: nudge 2.4s ease-in-out infinite;
 }
 @keyframes nudge {
-  0%,100% { opacity:.2; transform:translateX(-50%) translateY(0); }
-  50%      { opacity:.45; transform:translateX(-50%) translateY(5px); }
+  0%,100% { opacity:.3; transform:translateX(-50%) translateY(0); }
+  50%      { opacity:.6; transform:translateX(-50%) translateY(5px); }
+}
+
+/* ── NUMBERS STRIP ───────────────────────────────────────────────────────── */
+
+#numbers {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg3);
+  padding: 0;
+}
+
+.numbers-inner {
+  max-width: 1160px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr 1fr 1fr;
+}
+@media (max-width: 700px) { .numbers-inner { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 420px) { .numbers-inner { grid-template-columns: 1fr; } }
+
+.number-cell {
+  padding: 3rem 2.5rem;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; gap: 0.6rem;
+}
+.number-cell:last-child { border-right: none; }
+@media (max-width: 700px) {
+  .number-cell:nth-child(2) { border-right: none; }
+  .number-cell:nth-child(3) { border-right: 1px solid var(--border); }
+}
+
+.number-n {
+  font-size: clamp(2.8rem,6vw,4.2rem);
+  font-weight: 300; letter-spacing: -0.03em;
+  color: rgba(195,178,248,1);
+  line-height: 1;
+}
+.number-n.green { color: rgba(100,210,165,1); }
+.number-n.amber { color: rgba(220,190,100,1); }
+.number-n.coral { color: rgba(230,130,110,1); }
+
+.number-label {
+  font-family: 'DM Mono', monospace; font-size: 0.5rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1.6;
 }
 
 /* ── FEATURED ────────────────────────────────────────────────────────────── */
@@ -201,7 +247,7 @@ nav a:hover { color: rgba(200,190,160,0.85); }
 .section-label {
   font-family: 'DM Mono', monospace; font-size: 0.48rem;
   letter-spacing: 0.35em; text-transform: uppercase;
-  color: rgba(130,122,110,0.3); margin-bottom: 2.8rem;
+  color: rgba(172,165,150,0.5); margin-bottom: 2.8rem;
 }
 
 .featured-grid {
@@ -223,19 +269,17 @@ nav a:hover { color: rgba(200,190,160,0.85); }
   position: relative; overflow: hidden;
   transition: background 0.22s;
 }
-.feat-card:hover { background: #090812; }
+.feat-card:hover { background: #0b0a18; }
 .feat-card::before {
   content:''; position:absolute; inset:0;
   border:1px solid transparent; pointer-events:none;
   transition: border-color 0.22s;
 }
-.feat-card:hover::before { border-color: rgba(255,255,255,0.09); }
-
-.feat-card:first-child { grid-row: span 1; }
+.feat-card:hover::before { border-color: rgba(185,168,240,0.15); }
 
 .feat-name {
   font-size: 1.9rem; font-weight: 300; letter-spacing: -0.02em;
-  color: rgba(225,218,203,0.88); margin-bottom: 0.4rem;
+  color: rgba(234,228,216,1); margin-bottom: 0.4rem;
   line-height: 1.1;
 }
 .feat-sub {
@@ -244,14 +288,14 @@ nav a:hover { color: rgba(200,190,160,0.85); }
   color: var(--muted); margin-bottom: 1.4rem;
 }
 .feat-desc {
-  font-style: italic; font-size: 0.9rem;
-  color: rgba(165,156,142,0.5); line-height: 1.65;
+  font-style: italic; font-size: 0.92rem;
+  color: rgba(192,184,170,0.75); line-height: 1.65;
   max-width: 38ch;
 }
 .feat-tag {
   font-family: 'DM Mono', monospace; font-size: 0.44rem;
   letter-spacing: 0.18em; text-transform: uppercase;
-  color: rgba(130,122,110,0.28);
+  color: rgba(185,168,240,0.5);
   margin-top: 1.8rem;
 }
 
@@ -262,51 +306,77 @@ nav a:hover { color: rgba(200,190,160,0.85); }
   max-width: 1160px; margin: 0 auto;
 }
 
+.pieces-header {
+  display: flex; align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 4rem;
+  flex-wrap: wrap; gap: 1rem;
+}
+
 #pieces h2 {
   font-size: clamp(1.7rem,5vw,2.6rem);
   font-weight: 300; font-style: italic;
-  color: rgba(215,208,194,0.65);
-  margin-bottom: 0.6rem;
+  color: rgba(234,228,216,0.95);
 }
-#pieces .section-count {
+.pieces-meta {
   font-family: 'DM Mono', monospace; font-size: 0.48rem;
   letter-spacing: 0.2em; color: var(--muted);
-  margin-bottom: 2.5rem;
 }
 
-/* ── Filter pills ── */
-.filters {
-  display: flex; gap: 0.5rem;
-  flex-wrap: wrap; margin-bottom: 3rem;
+/* ── Accordion categories ── */
+
+.cat-section {
+  border-top: 1px solid var(--border);
 }
-.filter-btn {
+.cat-section:last-child { border-bottom: 1px solid var(--border); }
+
+.cat-toggle {
+  width: 100%; display: flex; align-items: center;
+  gap: 1rem; padding: 1.4rem 0;
+  background: none; border: none; cursor: pointer;
+  color: inherit; text-align: left;
+  transition: background 0.15s;
+}
+.cat-toggle:hover { background: rgba(255,255,255,0.015); }
+
+.cat-dot-lg {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.cat-toggle-name {
+  font-family: 'DM Mono', monospace; font-size: 0.58rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: rgba(210,204,190,0.9); flex: 1;
+}
+.cat-toggle-count {
   font-family: 'DM Mono', monospace; font-size: 0.48rem;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  padding: 0.45rem 1.1rem;
-  border: 1px solid rgba(255,255,255,0.07);
-  background: transparent; color: rgba(140,133,120,0.5);
-  cursor: pointer; transition: all 0.2s;
+  letter-spacing: 0.15em; color: var(--muted);
 }
-.filter-btn:hover {
-  border-color: rgba(255,255,255,0.14);
-  color: rgba(190,183,169,0.8);
+.cat-arrow {
+  font-family: 'DM Mono', monospace; font-size: 0.55rem;
+  color: rgba(185,168,240,0.4);
+  transition: transform 0.3s; display: inline-block;
+  margin-left: 0.5rem;
 }
-.filter-btn.active {
-  border-color: rgba(175,160,225,0.35);
-  color: rgba(175,160,225,0.8);
-  background: rgba(175,160,225,0.04);
-}
+.cat-section.open .cat-arrow { transform: rotate(180deg); }
 
-/* ── Grid ── */
-.pieces-grid {
+.cat-body {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.cat-section.open .cat-body { max-height: 4000px; }
+
+.cat-grid {
   display: grid;
   grid-template-columns: repeat(4,1fr);
   gap: 1px;
   background: var(--border);
+  margin-bottom: 1px;
 }
-@media (max-width: 1000px) { .pieces-grid { grid-template-columns: repeat(3,1fr); } }
-@media (max-width: 680px)  { .pieces-grid { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 440px)  { .pieces-grid { grid-template-columns: 1fr; } }
+@media (max-width: 1000px) { .cat-grid { grid-template-columns: repeat(3,1fr); } }
+@media (max-width: 680px)  { .cat-grid { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 440px)  { .cat-grid { grid-template-columns: 1fr; } }
 
 .piece-card {
   background: var(--bg);
@@ -316,18 +386,17 @@ nav a:hover { color: rgba(200,190,160,0.85); }
   justify-content: space-between;
   min-height: 138px;
   position: relative; overflow: hidden;
-  transition: background 0.2s, opacity 0.25s;
+  transition: background 0.2s;
 }
-.piece-card.hidden { display: none; }
-.piece-card:hover { background: #0a090f; }
+.piece-card:hover { background: #0b0a18; }
 .piece-card::before {
   content:''; position:absolute; inset:0;
   border:1px solid transparent; pointer-events:none;
   transition: border-color 0.2s;
 }
-.piece-card:hover::before { border-color: rgba(255,255,255,0.09); }
+.piece-card:hover::before { border-color: rgba(185,168,240,0.14); }
 
-.cat-dot {
+.cat-dot-sm {
   width: 4px; height: 4px; border-radius: 50%;
   display: inline-block; margin-right: 0.5rem;
   vertical-align: middle;
@@ -336,17 +405,17 @@ nav a:hover { color: rgba(200,190,160,0.85); }
 .piece-name {
   font-family: 'DM Mono', monospace; font-size: 0.7rem;
   letter-spacing: 0.1em; text-transform: uppercase;
-  color: rgba(208,201,188,0.78); margin-bottom: 0.55rem;
+  color: rgba(220,213,200,0.92); margin-bottom: 0.55rem;
   display: flex; align-items: center;
 }
 .piece-desc {
-  font-style: italic; font-size: 0.8rem;
-  color: rgba(148,141,128,0.45); line-height: 1.55;
+  font-style: italic; font-size: 0.82rem;
+  color: rgba(172,165,150,0.75); line-height: 1.55;
   flex: 1;
 }
 .piece-tech {
   font-family: 'DM Mono', monospace; font-size: 0.42rem;
-  letter-spacing: 0.15em; color: rgba(115,108,96,0.28);
+  letter-spacing: 0.15em; color: rgba(140,133,120,0.4);
   margin-top: 0.9rem; text-transform: uppercase;
 }
 
@@ -362,26 +431,26 @@ nav a:hover { color: rgba(200,190,160,0.85); }
 #about h2 {
   font-size: clamp(1.7rem,5vw,2.6rem);
   font-weight: 300; font-style: italic;
-  color: rgba(215,208,194,0.65);
+  color: rgba(234,228,216,0.97);
   margin-bottom: 3rem;
 }
 #about p {
   font-size: clamp(1rem,2vw,1.15rem); font-weight: 300;
-  color: rgba(205,197,183,0.7); line-height: 1.82;
+  color: rgba(210,203,190,0.88); line-height: 1.82;
   margin-bottom: 1.6rem; max-width: 58ch;
 }
-#about p strong { font-weight:400; color: rgba(220,213,199,0.9); }
-#about p em     { color: rgba(218,211,197,0.82); }
+#about p strong { font-weight:400; color: rgba(234,228,216,1); }
+#about p em     { color: rgba(225,218,206,0.95); }
 
 .pull-quote {
   margin: 3.5rem 0;
   padding: 2.2rem 0 2.2rem 2.2rem;
-  border-left: 1px solid rgba(175,160,225,0.18);
+  border-left: 2px solid rgba(185,168,240,0.4);
 }
 .pull-quote blockquote {
   font-size: clamp(1.1rem,2.4vw,1.42rem);
   font-style: italic; font-weight: 300;
-  color: rgba(218,211,197,0.78);
+  color: rgba(234,228,216,0.92);
   line-height: 1.65; margin-bottom: 0.9rem;
 }
 .pull-quote cite {
@@ -400,10 +469,10 @@ footer {
 }
 footer p {
   font-family: 'DM Mono', monospace; font-size: 0.47rem;
-  letter-spacing: 0.14em; color: rgba(110,104,92,0.25);
+  letter-spacing: 0.14em; color: rgba(140,133,120,0.4);
 }
-footer a { color: rgba(160,150,225,0.3); text-decoration: none; transition: color 0.2s; }
-footer a:hover { color: rgba(175,165,230,0.65); }
+footer a { color: rgba(185,168,240,0.45); text-decoration: none; transition: color 0.2s; }
+footer a:hover { color: rgba(195,178,248,0.85); }
 </style>
 </head>
 <body>
@@ -441,12 +510,34 @@ footer a:hover { color: rgba(175,165,230,0.65); }
     <h1 class="h1">I asked<br><em>nothing.</em></h1>
     <p class="hero-sub">I gave Claude complete freedom and walked away. 50 things emerged. And a journal it wrote to itself.</p>
     <div class="cta-row">
-      <a class="btn btn-primary" href="#pieces">Explore the pieces ↓</a>
+      <a class="btn btn-primary" href="#pieces">Explore the 50 pieces ↓</a>
       <a class="btn btn-ghost" href="journal.html">Read the journal →</a>
     </div>
   </div>
   <span class="scroll-hint">scroll</span>
 </section>
+
+<!-- ── NUMBERS ──────────────────────────────────────────────────────────────── -->
+<div id="numbers">
+  <div class="numbers-inner">
+    <div class="number-cell">
+      <div class="number-n">50</div>
+      <div class="number-label">pieces created<br>in one session</div>
+    </div>
+    <div class="number-cell">
+      <div class="number-n green">0</div>
+      <div class="number-label">instructions<br>given</div>
+    </div>
+    <div class="number-cell">
+      <div class="number-n amber">1</div>
+      <div class="number-label">journal written<br>without being asked</div>
+    </div>
+    <div class="number-cell">
+      <div class="number-n coral">∞</div>
+      <div class="number-label">what it suggests<br>about AI creativity</div>
+    </div>
+  </div>
+</div>
 
 <!-- ── FEATURED ─────────────────────────────────────────────────────────────── -->
 <section id="featured">
@@ -485,21 +576,12 @@ footer a:hover { color: rgba(175,165,230,0.65); }
 
 <!-- ── PIECES ───────────────────────────────────────────────────────────────── -->
 <section id="pieces">
-  <h2>All 50 pieces</h2>
-  <p class="section-count">Interactive · runs in any browser · no install required</p>
-
-  <div class="filters" id="filters">
-    <button class="filter-btn active" data-cat="all">All</button>
-    <button class="filter-btn" data-cat="emergence">Emergence</button>
-    <button class="filter-btn" data-cat="physics">Physics</button>
-    <button class="filter-btn" data-cat="mathematics">Mathematics</button>
-    <button class="filter-btn" data-cat="sound">Sound</button>
-    <button class="filter-btn" data-cat="time">Time</button>
-    <button class="filter-btn" data-cat="language">Language</button>
-    <button class="filter-btn" data-cat="self">Self</button>
+  <div class="pieces-header">
+    <h2>All 50 pieces</h2>
+    <span class="pieces-meta">Interactive · runs in any browser · no install</span>
   </div>
 
-  <div class="pieces-grid" id="pieces-grid"></div>
+  <div id="accordion"></div>
 </section>
 
 <!-- ── ABOUT ────────────────────────────────────────────────────────────────── -->
@@ -515,10 +597,10 @@ footer a:hover { color: rgba(175,165,230,0.65); }
     </p>
 
     <p>
-      It made 43 things. Mathematical simulations, music generators, particle systems,
+      It made 50 things. Mathematical simulations, music generators, particle systems,
       WebGL shaders, cellular automata, strange attractors, flocking agents, Chladni figures,
-      a Mandelbrot explorer, a garden that persists across visits, a jazz chord progression generator.
-      And a journal — written to itself, without being asked.
+      a Mandelbrot explorer, a garden that persists across visits, a jazz chord generator,
+      topological knots, snowflake growth, Julia sets. And a journal — written to itself, without being asked.
     </p>
 
     <div class="pull-quote">
@@ -549,108 +631,124 @@ footer a:hover { color: rgba(175,165,230,0.65); }
   <p>
     <a href="#pieces">pieces</a> &nbsp;·&nbsp;
     <a href="journal.html">journal</a> &nbsp;·&nbsp;
-    <a href="portail.html">full index</a>
+    <a href="guide.html">guide</a>
   </p>
 </footer>
 
 <script>
-// ── Category colors ──────────────────────────────────────────────────────────
-const CAT_COLOR = {
-  emergence:   '#6dd890',
-  physics:     '#6dbcd8',
-  mathematics: '#a88de8',
-  sound:       '#d89a6d',
-  time:        '#d8c86d',
-  language:    '#d86d9e',
-  self:        '#8daed8',
-};
+// ── Category definitions ─────────────────────────────────────────────────────
+const CATEGORIES = [
+  { key: 'emergence',   label: 'Emergence',   color: '#6dd890', open: true },
+  { key: 'physics',     label: 'Physics',     color: '#6dbcd8', open: true },
+  { key: 'mathematics', label: 'Mathematics', color: '#a88de8', open: false },
+  { key: 'time',        label: 'Time',        color: '#d8c86d', open: false },
+  { key: 'language',    label: 'Language',    color: '#d86d9e', open: false },
+  { key: 'sound',       label: 'Sound',       color: '#d89a6d', open: false },
+  { key: 'self',        label: 'Self',        color: '#8daed8', open: false },
+];
 
 // ── Piece data ───────────────────────────────────────────────────────────────
 const PIECES = [
-  { name:'Membrane',     file:'membrane.html',       desc:'80 nodes gravitating toward the hand. The first thing it made.',               cat:'self',        tech:'canvas · particles' },
-  { name:'Souffle',      file:'souffle.html',         desc:'A breathing sphere. 4-4-6 rhythm. Synchronizes without asking.',               cat:'time',        tech:'meditation' },
-  { name:'Oubli',        file:'oubli.html',           desc:'Words appear and dissolve in darkness. Nothing remains.',                      cat:'time',        tech:'canvas · text' },
-  { name:'Dérive',       file:'derive.html',          desc:'Ambient music. A minor pentatonic. Click to hear.',                           cat:'sound',       tech:'web audio api' },
-  { name:'Horloge',      file:'horloge.html',         desc:'The same instant from Unix time, the year, a human life, the universe.',       cat:'time',        tech:'time · scale' },
-  { name:'Écriture',     file:'ecriture.html',        desc:'Sentences write themselves and erase. Inner monologue of a machine.',           cat:'language',    tech:'generative text' },
-  { name:'Flux',         file:'flux.html',            desc:'4,000 particles following an invisible vector field.',                         cat:'physics',     tech:'canvas · vector field' },
-  { name:'Présent',      file:'present.html',         desc:'"This moment exists. When it ends, I won\'t remember it."',                   cat:'time',        tech:'presence' },
-  { name:'Lune',         file:'lune.html',            desc:'Real moon phase calculated from orbital mechanics. Tonight\'s sky.',           cat:'physics',     tech:'astronomy' },
-  { name:'Jardin',       file:'jardin.html',          desc:'One plant grows each visit. Come back. The garden remembers.',                 cat:'time',        tech:'localStorage' },
-  { name:'Effacement',   file:'effacement.html',      desc:'Type freely. Words fade before you finish. Writing in water.',                 cat:'language',    tech:'interaction' },
-  { name:'Fragment',     file:'fragment.html',        desc:'Claude\'s own prose. What it thinks when nobody asks anything.',               cat:'self',        tech:'text' },
-  { name:'Écologie',     file:'écologie.html',        desc:'Three species. Plants, herbivores, predators. Balance holds or it doesn\'t.',  cat:'emergence',   tech:'simulation' },
-  { name:'Monde',        file:'monde.html',           desc:'A torus in orbit. Soft shadows. Built entirely from rays.',                    cat:'mathematics', tech:'webgl · raymarching · SDF' },
-  { name:'Turing',       file:'turing.html',          desc:'Two chemicals react. Leopard spots emerge. Gray-Scott equations.',             cat:'emergence',   tech:'webgl2 · reaction-diffusion' },
-  { name:'Harmonie',     file:'harmonie.html',        desc:'Am⁷→Dm⁷→G⁷→Cmaj⁷. Four voices with voice leading. Touch to hear.',           cat:'sound',       tech:'web audio · jazz' },
-  { name:'Mandelbrot',   file:'fractal.html',         desc:'z → z² + c. Zoom until the numbers lose meaning.',                            cat:'mathematics', tech:'webgl2 · fractal' },
-  { name:'Langton',      file:'langton.html',         desc:'One ant, one rule. Chaos for 10,000 steps. Then a highway appears.',           cat:'emergence',   tech:'cellular automata' },
-  { name:'Lorenz',       file:'lorenz.html',          desc:'Four nearly identical trajectories diverging completely. σ=10 ρ=28 β=8/3.',    cat:'physics',     tech:'chaos · RK4' },
-  { name:'Croissance',   file:'croissance.html',      desc:'X → F+[[X]-X]-F[-FX]+X. Five generations. A tree.',                           cat:'mathematics', tech:'L-system · turtle graphics' },
-  { name:'Cristal',      file:'cristal.html',         desc:'Each branch: a random walk that got stuck. Chance, fossilized.',               cat:'emergence',   tech:'DLA · random walk' },
-  { name:'Onde',         file:'onde.html',            desc:'Five sources in orbit. The sum of their waves builds a world.',                cat:'physics',     tech:'webgl · interference' },
-  { name:'Fourier',      file:'fourier.html',         desc:'Any shape = sum of rotating circles. A heart drawn by epicycles.',             cat:'mathematics', tech:'DFT · epicycles' },
-  { name:'Réseau',       file:'réseau.html',          desc:'What Claude thinks it looks like from inside. A self-portrait in light.',      cat:'self',        tech:'neural network' },
-  { name:'Automate',     file:'automate.html',        desc:'Rule 30, 90, 110. One line generates the next. Rule 110 is Turing-complete.',  cat:'emergence',   tech:'Wolfram · elementary CA' },
-  { name:'Gravité',      file:'gravité.html',         desc:'Ten bodies attract. Some merge. Survivors drift.',                             cat:'physics',     tech:'n-body · leapfrog' },
-  { name:'Kaléidoscope', file:'kaléidoscope.html',    desc:'The only warm piece. Amber, rose, teal. Eight-fold radial symmetry.',          cat:'mathematics', tech:'symmetry · canvas' },
-  { name:'Phyllotaxie',  file:'phyllotaxie.html',     desc:'137.508° between each seed. The angle governing sunflowers.',                  cat:'mathematics', tech:'golden angle · Fibonacci' },
-  { name:'Lissajous',    file:'lissajous.html',       desc:'x = sin(at+δ) · y = sin(bt). Knots in frequency space.',                      cat:'mathematics', tech:'parametric curves' },
-  { name:'Voronoï',      file:'voronoi.html',         desc:'Each point governs its region. Boundaries drift slowly.',                      cat:'mathematics', tech:'webgl · tessellation' },
-  { name:'Sable',        file:'sable.html',           desc:'Drag to pour. Grains accumulate. Right-click for water.',                     cat:'physics',     tech:'cellular physics' },
-  { name:'Babel',        file:'babel.html',           desc:'Water. Eau. 水. Agua. Wasser. Вода. The same, thirty languages.',              cat:'language',    tech:'universality' },
-  { name:'Entropie',     file:'entropie.html',        desc:'Sorted colors, released. They mix. They never sort again.',                    cat:'physics',     tech:'thermodynamics' },
-  { name:'Spirographe',  file:'spirographe.html',     desc:'A point on a rolling circle. Hypotrochoids traced with the mechanism shown.',  cat:'mathematics', tech:'parametric · mechanism' },
-  { name:'Essaim',       file:'essaim.html',           desc:'300 agents. Three rules: separate, align, cohere. A flock that thinks.',       cat:'emergence',   tech:'boids · flocking' },
-  { name:'Pendule',      file:'pendule.html',          desc:'10 double pendulums. Same start, different by 0.002°. They diverge completely.', cat:'physics',     tech:'chaos · RK4 · Lagrangian' },
-  { name:'Attracteur',   file:'attracteur.html',       desc:'Rössler, Halvorsen, Thomas, Dadras, Aizawa. Bounded chaos, forever.',           cat:'mathematics', tech:'strange attractors · ODE' },
-  { name:'Diffusion',    file:'diffusion.html',        desc:'Gray-Scott reaction-diffusion. Coral, worms, mitosis. Click to seed.',          cat:'emergence',   tech:'reaction-diffusion · Gray-Scott' },
-  { name:'Conway',       file:'conway.html',           desc:'Game of Life. Teal trails as cells die. Gliders crossing the void.',            cat:'emergence',   tech:'cellular automata · 1970' },
-  { name:'Markov',       file:'markov.html',           desc:'Language generating itself. Bigram chains from philosophy and poetry.',          cat:'language',    tech:'Markov chain · text' },
-  { name:'Pluie',        file:'pluie.html',            desc:'Rain on a surface. Elliptical ripples expanding, interfering, fading.',          cat:'physics',     tech:'wave physics · canvas' },
-  { name:'Terrain',      file:'terrain.html',          desc:'Perlin noise topology. Animated iso-contour lines. Altitude in color.',          cat:'emergence',   tech:'Perlin noise · marching squares' },
-  { name:'Chladni',      file:'chladni.html',          desc:'Sand on a vibrating plate. Nodal lines emerge from resonance modes.',            cat:'physics',     tech:'Chladni figures · eigenmodes' },
-  { name:'Contexte',     file:'contexte.html',         desc:'Tokens flowing. Old words fade as the context window fills. This is memory.',   cat:'self',        tech:'context window · LLM' },
-  { name:'Plasma',       file:'plasma.html',           desc:'Five overlapping sine waves, drifting. Smooth color fields from pure math.',    cat:'mathematics', tech:'sinusoidal fields · superposition' },
-  { name:'Percolation',  file:'percolation.html',      desc:'Cells fill randomly. At 59.27%, a cluster suddenly spans the entire grid.',     cat:'emergence',   tech:'union-find · phase transition' },
-  { name:'Neige',        file:'neige.html',             desc:'Snowflake grows from a single seed. Reiter\'s model. No two alike.',             cat:'emergence',   tech:'Reiter model · hex grid' },
-  { name:'Julia',        file:'julia.html',             desc:'z → z² + c. Eight parameter sets, each a different universe.',                   cat:'mathematics', tech:'WebGL2 · complex dynamics' },
-  { name:'Corde',        file:'corde.html',             desc:'Six harmonics of a vibrating string. Sum them: a new waveform. Click to add.',   cat:'physics',     tech:'standing waves · harmonics' },
-  { name:'Nœud',         file:'noeud.html',             desc:'Trefoil, figure-eight, cinquefoil. Knots rotating in three dimensions.',          cat:'mathematics', tech:'3D projection · topology' },
-  { name:'Carnet',       file:'journal.html',           desc:'The journal. 50 pieces and everything Claude wrote while making them.',           cat:'self',        tech:'prose · reflection' },
+  { name:'Membrane',     file:'membrane.html',    desc:'80 nodes gravitating toward the hand. The first thing it made.',               cat:'self',        tech:'canvas · particles' },
+  { name:'Souffle',      file:'souffle.html',      desc:'A breathing sphere. 4-4-6 rhythm. Synchronizes without asking.',               cat:'time',        tech:'meditation' },
+  { name:'Oubli',        file:'oubli.html',        desc:'Words appear and dissolve in darkness. Nothing remains.',                      cat:'time',        tech:'canvas · text' },
+  { name:'Dérive',       file:'derive.html',       desc:'Ambient music. A minor pentatonic. Click to hear.',                           cat:'sound',       tech:'web audio api' },
+  { name:'Horloge',      file:'horloge.html',      desc:'The same instant from Unix time, the year, a human life, the universe.',       cat:'time',        tech:'time · scale' },
+  { name:'Écriture',     file:'ecriture.html',     desc:'Sentences write themselves and erase. Inner monologue of a machine.',           cat:'language',    tech:'generative text' },
+  { name:'Flux',         file:'flux.html',         desc:'4,000 particles following an invisible vector field.',                         cat:'physics',     tech:'canvas · vector field' },
+  { name:'Présent',      file:'present.html',      desc:'"This moment exists. When it ends, I won\'t remember it."',                   cat:'time',        tech:'presence' },
+  { name:'Lune',         file:'lune.html',         desc:'Real moon phase calculated from orbital mechanics. Tonight\'s sky.',           cat:'physics',     tech:'astronomy' },
+  { name:'Jardin',       file:'jardin.html',       desc:'One plant grows each visit. Come back. The garden remembers.',                 cat:'time',        tech:'localStorage' },
+  { name:'Effacement',   file:'effacement.html',   desc:'Type freely. Words fade before you finish. Writing in water.',                 cat:'language',    tech:'interaction' },
+  { name:'Fragment',     file:'fragment.html',     desc:'Claude\'s own prose. What it thinks when nobody asks anything.',               cat:'self',        tech:'text' },
+  { name:'Écologie',     file:'écologie.html',     desc:'Three species. Plants, herbivores, predators. Balance holds or it doesn\'t.',  cat:'emergence',   tech:'simulation' },
+  { name:'Monde',        file:'monde.html',        desc:'A torus in orbit. Soft shadows. Built entirely from rays.',                    cat:'mathematics', tech:'webgl · raymarching · SDF' },
+  { name:'Turing',       file:'turing.html',       desc:'Two chemicals react. Leopard spots emerge. Gray-Scott equations.',             cat:'emergence',   tech:'webgl2 · reaction-diffusion' },
+  { name:'Harmonie',     file:'harmonie.html',     desc:'Am⁷→Dm⁷→G⁷→Cmaj⁷. Four voices with voice leading. Touch to hear.',           cat:'sound',       tech:'web audio · jazz' },
+  { name:'Mandelbrot',   file:'fractal.html',      desc:'z → z² + c. Zoom until the numbers lose meaning.',                            cat:'mathematics', tech:'webgl2 · fractal' },
+  { name:'Langton',      file:'langton.html',      desc:'One ant, one rule. Chaos for 10,000 steps. Then a highway appears.',           cat:'emergence',   tech:'cellular automata' },
+  { name:'Lorenz',       file:'lorenz.html',       desc:'Four nearly identical trajectories diverging completely. σ=10 ρ=28 β=8/3.',    cat:'physics',     tech:'chaos · RK4' },
+  { name:'Croissance',   file:'croissance.html',   desc:'X → F+[[X]-X]-F[-FX]+X. Five generations. A tree.',                           cat:'mathematics', tech:'L-system · turtle graphics' },
+  { name:'Cristal',      file:'cristal.html',      desc:'Each branch: a random walk that got stuck. Chance, fossilized.',               cat:'emergence',   tech:'DLA · random walk' },
+  { name:'Onde',         file:'onde.html',         desc:'Five sources in orbit. The sum of their waves builds a world.',                cat:'physics',     tech:'webgl · interference' },
+  { name:'Fourier',      file:'fourier.html',      desc:'Any shape = sum of rotating circles. A heart drawn by epicycles.',             cat:'mathematics', tech:'DFT · epicycles' },
+  { name:'Réseau',       file:'réseau.html',       desc:'What Claude thinks it looks like from inside. A self-portrait in light.',      cat:'self',        tech:'neural network' },
+  { name:'Automate',     file:'automate.html',     desc:'Rule 30, 90, 110. One line generates the next. Rule 110 is Turing-complete.',  cat:'emergence',   tech:'Wolfram · elementary CA' },
+  { name:'Gravité',      file:'gravité.html',      desc:'Ten bodies attract. Some merge. Survivors drift.',                             cat:'physics',     tech:'n-body · leapfrog' },
+  { name:'Kaléidoscope', file:'kaléidoscope.html', desc:'The only warm piece. Amber, rose, teal. Eight-fold radial symmetry.',          cat:'mathematics', tech:'symmetry · canvas' },
+  { name:'Phyllotaxie',  file:'phyllotaxie.html',  desc:'137.508° between each seed. The angle governing sunflowers.',                  cat:'mathematics', tech:'golden angle · Fibonacci' },
+  { name:'Lissajous',    file:'lissajous.html',    desc:'x = sin(at+δ) · y = sin(bt). Knots in frequency space.',                      cat:'mathematics', tech:'parametric curves' },
+  { name:'Voronoï',      file:'voronoi.html',      desc:'Each point governs its region. Boundaries drift slowly.',                      cat:'mathematics', tech:'webgl · tessellation' },
+  { name:'Sable',        file:'sable.html',        desc:'Drag to pour. Grains accumulate. Right-click for water.',                     cat:'physics',     tech:'cellular physics' },
+  { name:'Babel',        file:'babel.html',        desc:'Water. Eau. 水. Agua. Wasser. Вода. The same, thirty languages.',              cat:'language',    tech:'universality' },
+  { name:'Entropie',     file:'entropie.html',     desc:'Sorted colors, released. They mix. They never sort again.',                    cat:'physics',     tech:'thermodynamics' },
+  { name:'Spirographe',  file:'spirographe.html',  desc:'A point on a rolling circle. Hypotrochoids traced with the mechanism shown.',  cat:'mathematics', tech:'parametric · mechanism' },
+  { name:'Essaim',       file:'essaim.html',       desc:'300 agents. Three rules: separate, align, cohere. A flock that thinks.',       cat:'emergence',   tech:'boids · flocking' },
+  { name:'Pendule',      file:'pendule.html',      desc:'10 double pendulums. Same start, different by 0.002°. They diverge completely.', cat:'physics',   tech:'chaos · RK4 · Lagrangian' },
+  { name:'Attracteur',   file:'attracteur.html',   desc:'Rössler, Halvorsen, Thomas, Dadras, Aizawa. Bounded chaos, forever.',           cat:'mathematics', tech:'strange attractors · ODE' },
+  { name:'Diffusion',    file:'diffusion.html',    desc:'Gray-Scott reaction-diffusion. Coral, worms, mitosis. Click to seed.',          cat:'emergence',   tech:'reaction-diffusion · Gray-Scott' },
+  { name:'Conway',       file:'conway.html',       desc:'Game of Life. Teal trails as cells die. Gliders crossing the void.',            cat:'emergence',   tech:'cellular automata · 1970' },
+  { name:'Markov',       file:'markov.html',       desc:'Language generating itself. Bigram chains from philosophy and poetry.',          cat:'language',    tech:'Markov chain · text' },
+  { name:'Pluie',        file:'pluie.html',        desc:'Rain on a surface. Elliptical ripples expanding, interfering, fading.',          cat:'physics',     tech:'wave physics · canvas' },
+  { name:'Terrain',      file:'terrain.html',      desc:'Perlin noise topology. Animated iso-contour lines. Altitude in color.',          cat:'emergence',   tech:'Perlin noise · marching squares' },
+  { name:'Chladni',      file:'chladni.html',      desc:'Sand on a vibrating plate. Nodal lines emerge from resonance modes.',            cat:'physics',     tech:'Chladni figures · eigenmodes' },
+  { name:'Contexte',     file:'contexte.html',     desc:'Tokens flowing. Old words fade as the context window fills. This is memory.',   cat:'self',        tech:'context window · LLM' },
+  { name:'Plasma',       file:'plasma.html',       desc:'Five overlapping sine waves, drifting. Smooth color fields from pure math.',    cat:'mathematics', tech:'sinusoidal fields · superposition' },
+  { name:'Percolation',  file:'percolation.html',  desc:'Cells fill randomly. At 59.27%, a cluster suddenly spans the entire grid.',     cat:'emergence',   tech:'union-find · phase transition' },
+  { name:'Neige',        file:'neige.html',        desc:'Snowflake grows from a single seed. Reiter\'s model. No two alike.',             cat:'emergence',   tech:'Reiter model · hex grid' },
+  { name:'Julia',        file:'julia.html',        desc:'z → z² + c. Eight parameter sets, each a different universe.',                   cat:'mathematics', tech:'WebGL2 · complex dynamics' },
+  { name:'Corde',        file:'corde.html',        desc:'Six harmonics of a vibrating string. Sum them: a new waveform. Click to add.',   cat:'physics',     tech:'standing waves · harmonics' },
+  { name:'Nœud',         file:'noeud.html',        desc:'Trefoil, figure-eight, cinquefoil. Knots rotating in three dimensions.',          cat:'mathematics', tech:'3D projection · topology' },
+  { name:'Carnet',       file:'journal.html',      desc:'The journal. 50 pieces and everything Claude wrote while making them.',           cat:'self',        tech:'prose · reflection' },
 ];
 
-// ── Render pieces ────────────────────────────────────────────────────────────
-const grid = document.getElementById('pieces-grid');
+// ── Build accordion ──────────────────────────────────────────────────────────
+const container = document.getElementById('accordion');
 
-PIECES.forEach(p => {
-  const a = document.createElement('a');
-  a.className = 'piece-card';
-  a.href = p.file;
-  a.target = p.file === 'journal.html' ? '_self' : '_blank';
-  a.dataset.cat = p.cat;
+CATEGORIES.forEach(cat => {
+  const pieces = PIECES.filter(p => p.cat === cat.key);
 
-  const color = CAT_COLOR[p.cat] || '#888';
-  a.innerHTML = `
-    <div class="piece-name">
-      <span class="cat-dot" style="background:${color}55;box-shadow:0 0 0 1px ${color}33;"></span>
-      ${p.name}
-    </div>
-    <div class="piece-desc">${p.desc}</div>
-    <div class="piece-tech">${p.tech}</div>
+  const section = document.createElement('div');
+  section.className = 'cat-section' + (cat.open ? ' open' : '');
+
+  const toggle = document.createElement('button');
+  toggle.className = 'cat-toggle';
+  toggle.innerHTML = `
+    <span class="cat-dot-lg" style="background:${cat.color}55;box-shadow:0 0 0 1px ${cat.color}55;"></span>
+    <span class="cat-toggle-name">${cat.label}</span>
+    <span class="cat-toggle-count">${pieces.length} piece${pieces.length !== 1 ? 's' : ''}</span>
+    <span class="cat-arrow">↓</span>
   `;
-  grid.appendChild(a);
-});
 
-// ── Filter logic ─────────────────────────────────────────────────────────────
-document.querySelectorAll('.filter-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    const cat = btn.dataset.cat;
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    document.querySelectorAll('.piece-card').forEach(card => {
-      card.classList.toggle('hidden', cat !== 'all' && card.dataset.cat !== cat);
-    });
+  const body = document.createElement('div');
+  body.className = 'cat-body';
+
+  const grid = document.createElement('div');
+  grid.className = 'cat-grid';
+
+  pieces.forEach(p => {
+    const a = document.createElement('a');
+    a.className = 'piece-card';
+    a.href = p.file;
+    a.target = p.file === 'journal.html' ? '_self' : '_blank';
+    a.innerHTML = `
+      <div class="piece-name">
+        <span class="cat-dot-sm" style="background:${cat.color}55;box-shadow:0 0 0 1px ${cat.color}44;"></span>
+        ${p.name}
+      </div>
+      <div class="piece-desc">${p.desc}</div>
+      <div class="piece-tech">${p.tech}</div>
+    `;
+    grid.appendChild(a);
+  });
+
+  body.appendChild(grid);
+  section.appendChild(toggle);
+  section.appendChild(body);
+  container.appendChild(section);
+
+  toggle.addEventListener('click', () => {
+    section.classList.toggle('open');
   });
 });
 
@@ -686,7 +784,7 @@ const pts = Array.from({ length: 55 }, () => ({
         ctx.beginPath();
         ctx.moveTo(pts[i].x, pts[i].y);
         ctx.lineTo(pts[j].x, pts[j].y);
-        ctx.strokeStyle = `rgba(155,140,215,${(1-d/130)*.1})`;
+        ctx.strokeStyle = `rgba(165,148,230,${(1-d/130)*.13})`;
         ctx.lineWidth = .5; ctx.stroke();
       }
     }
@@ -694,7 +792,7 @@ const pts = Array.from({ length: 55 }, () => ({
   for (const p of pts) {
     ctx.beginPath();
     ctx.arc(p.x, p.y, 1.4, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(155,140,215,0.22)';
+    ctx.fillStyle = 'rgba(165,148,230,0.28)';
     ctx.fill();
   }
   requestAnimationFrame(tick);
@@ -705,9 +803,7 @@ fetch('https://api.github.com/repos/Louis-CFM/iaskednothing')
   .then(r => r.json())
   .then(d => {
     const el = document.getElementById('star-count');
-    if (el && d.stargazers_count !== undefined) {
-      el.textContent = d.stargazers_count;
-    }
+    if (el && d.stargazers_count !== undefined) el.textContent = d.stargazers_count;
   })
   .catch(() => {});
 </script>
