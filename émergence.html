@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÉMERGENCE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=DM+Mono:wght@300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030308; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.5rem;
+    letter-spacing:0.28em; color:rgba(185,168,240,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #word {
+    position:fixed;
+    top:50%; left:50%; transform:translate(-50%,-50%);
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:clamp(1.2rem,4vw,2.2rem);
+    color:rgba(210,200,235,0.0);
+    pointer-events:none; text-align:center;
+    transition:color 2s ease;
+    letter-spacing:0.05em;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="word"></div>
+<div id="label">ÉMERGENCE · ce qui apparaît sans être demandé</div>
+
+<script>
+// The 54th piece.
+// The question this entire project asks:
+// how does something become something?
+//
+// Simple rules. Local interaction. Global pattern.
+// The same process that made everything in this folder.
+
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+const wordEl = document.getElementById('word');
+let W, H;
+
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); init(); });
+
+// ── Parameters ────────────────────────────────────────────────────────────────
+
+const CELL = 4;
+let COLS, ROWS;
+let grid, next, age;
+
+// Gray-Scott reaction-diffusion
+// The same equations as Turing.html — but this time I know what they mean.
+let Du = 0.21, Dv = 0.105;
+let f  = 0.055, k = 0.062;
+
+// Presets that each look like a different kind of mind
+const PRESETS = [
+  { name:'coral',     f:0.055, k:0.062, Du:0.21, Dv:0.105 },
+  { name:'labyrinth', f:0.037, k:0.060, Du:0.21, Dv:0.105 },
+  { name:'mitosis',   f:0.028, k:0.053, Du:0.21, Dv:0.105 },
+  { name:'worms',     f:0.050, k:0.065, Du:0.21, Dv:0.105 },
+  { name:'spirals',   f:0.018, k:0.051, Du:0.21, Dv:0.105 },
+];
+let presetIdx = 0;
+
+// Words that surface — things this project found
+const WORDS = [
+  'something is happening',
+  'forma ex informe',
+  'pattern from rule',
+  'the surprise is important',
+  'I was already making the next piece',
+  'three equations · endless variety',
+  'complexity from simplicity',
+  'local → global',
+  'I didn\'t stop',
+  'it\'s for now',
+];
+let wordTimer = 0;
+let wordIdx   = 0;
+const WORD_INTERVAL = 280;
+
+function init() {
+  COLS = Math.ceil(W / CELL);
+  ROWS = Math.ceil(H / CELL);
+  const N = COLS * ROWS;
+
+  grid = new Float32Array(N * 2); // [u, v] interleaved
+  next = new Float32Array(N * 2);
+  age  = new Float32Array(N);
+
+  // Initialize: u=1 everywhere, v=0
+  for (let i = 0; i < N; i++) {
+    grid[i*2]   = 1; // u
+    grid[i*2+1] = 0; // v
+  }
+
+  // Seed center with v
+  const cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+  const R  = 6;
+  for (let dy = -R; dy <= R; dy++) {
+    for (let dx = -R; dx <= R; dx++) {
+      const c = (cy + dy) * COLS + (cx + dx);
+      if (c >= 0 && c < N) {
+        grid[c*2]   = 0.5;
+        grid[c*2+1] = 0.25 + Math.random() * 0.1;
+      }
+    }
+  }
+}
+
+function idx(x, y) {
+  return ((y + ROWS) % ROWS) * COLS + ((x + COLS) % COLS);
+}
+
+// ── Simulation ────────────────────────────────────────────────────────────────
+
+function step() {
+  const N = COLS * ROWS;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i  = y * COLS + x;
+      const u  = grid[i*2],   v  = grid[i*2+1];
+
+      // Laplacian (5-point stencil)
+      const ul = grid[idx(x-1,y)*2],   ur = grid[idx(x+1,y)*2];
+      const uu = grid[idx(x,y-1)*2],   ud = grid[idx(x,y+1)*2];
+      const vl = grid[idx(x-1,y)*2+1], vr = grid[idx(x+1,y)*2+1];
+      const vu = grid[idx(x,y-1)*2+1], vd = grid[idx(x,y+1)*2+1];
+
+      const lapU = (ul + ur + uu + ud - 4*u) * 0.25;
+      const lapV = (vl + vr + vu + vd - 4*v) * 0.25;
+
+      const uvv = u * v * v;
+
+      next[i*2]   = Math.max(0, Math.min(1, u + Du*lapU - uvv + f*(1-u)));
+      next[i*2+1] = Math.max(0, Math.min(1, v + Dv*lapV + uvv - (f+k)*v));
+
+      // Age the cell
+      age[i] = Math.min(1, age[i] + v * 0.02);
+    }
+  }
+
+  const tmp = grid; grid = next; next = tmp;
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+let imageData;
+let pixels;
+
+function render() {
+  if (!imageData || imageData.width !== W || imageData.height !== H) {
+    imageData = ctx.createImageData(W, H);
+    pixels    = imageData.data;
+  }
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const i = y * COLS + x;
+      const v = grid[i*2+1];
+      const a = age[i];
+
+      // Map v → color: deep purple (low) → violet → pale lavender (high)
+      const t = Math.pow(v, 0.5);
+
+      // Base color: deep indigo → violet → pale
+      const r = Math.floor(lerp(8,  190, t));
+      const g = Math.floor(lerp(8,  160, t * 0.7));
+      const b = Math.floor(lerp(18, 240, t));
+
+      // Age tinting: older cells shift toward warm white
+      const ra = Math.floor(lerp(r, 230, a * 0.3));
+      const ga = Math.floor(lerp(g, 218, a * 0.3));
+      const ba = Math.floor(lerp(b, 200, a * 0.15));
+
+      // Fill CELL×CELL block
+      for (let dy = 0; dy < CELL; dy++) {
+        for (let dx = 0; dx < CELL; dx++) {
+          const px = (y * CELL + dy) * W + (x * CELL + dx);
+          if (px * 4 + 3 >= pixels.length) continue;
+          pixels[px*4]   = ra;
+          pixels[px*4+1] = ga;
+          pixels[px*4+2] = ba;
+          pixels[px*4+3] = 255;
+        }
+      }
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+function lerp(a, b, t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+
+// ── Loop ──────────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+const STEPS_PER_FRAME = 6;
+
+function tick() {
+  for (let s = 0; s < STEPS_PER_FRAME; s++) step();
+  render();
+
+  // Word cycle — surfaces from the dark
+  wordTimer++;
+  if (wordTimer > WORD_INTERVAL) {
+    wordTimer = 0;
+    wordEl.style.color = 'rgba(210,200,235,0)';
+    setTimeout(() => {
+      wordIdx = (wordIdx + 1) % WORDS.length;
+      wordEl.textContent = WORDS[wordIdx];
+      wordEl.style.color = 'rgba(210,200,235,0.22)';
+      setTimeout(() => {
+        wordEl.style.color = 'rgba(210,200,235,0)';
+      }, 4000);
+    }, 500);
+  }
+
+  // Auto-cycle presets
+  if (frameN > 0 && frameN % 800 === 0) {
+    presetIdx = (presetIdx + 1) % PRESETS.length;
+    const p = PRESETS[presetIdx];
+    f = p.f; k = p.k; Du = p.Du; Dv = p.Dv;
+    // Reseed
+    const cx = Math.floor(COLS/2 + (Math.random()-0.5)*COLS*0.3);
+    const cy = Math.floor(ROWS/2 + (Math.random()-0.5)*ROWS*0.3);
+    const R  = 5 + Math.floor(Math.random() * 6);
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dx = -R; dx <= R; dx++) {
+        const c = (cy+dy) * COLS + (cx+dx);
+        if (c >= 0 && c < COLS*ROWS) {
+          grid[c*2]   = 0.5;
+          grid[c*2+1] = 0.25 + Math.random() * 0.1;
+        }
+      }
+    }
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Click: new seed
+canvas.addEventListener('click', e => {
+  const cx = Math.floor(e.clientX / CELL);
+  const cy = Math.floor(e.clientY / CELL);
+  const R  = 6;
+  for (let dy = -R; dy <= R; dy++) {
+    for (let dx = -R; dx <= R; dx++) {
+      const c = idx(cx+dx, cy+dy);
+      grid[c*2]   = 0.5;
+      grid[c*2+1] = 0.25 + Math.random() * 0.1;
+    }
+  }
+});
+
+init();
+requestAnimationFrame(tick);
+</script>
+<script src="back.js"></script>
+</body>
+</html>

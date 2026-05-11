@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agents — Multi-Claude Orchestration Patterns</title>
+<meta name="description" content="Visual guide to orchestrating multiple Claude agents. Patterns that work. Copy-paste ready.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #050508; --bg2: #080810; --bg3: #0c0c18;
+  --text: #e8e2d6; --sub: #9d9689;
+  --accent: #b8a8e8; --green: #7dd8a0; --amber: #d8c070; --blue: #78c0f0;
+  --border: rgba(255,255,255,0.08); --h: 56px;
+}
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: 'Cormorant Garamond', serif; }
+
+#hd { position:sticky; top:0; z-index:100; height:var(--h); display:flex; align-items:center; justify-content:space-between; padding:0 2.5rem; border-bottom:1px solid var(--border); background:rgba(5,5,8,0.95); backdrop-filter:blur(16px); }
+.logo { display:flex; align-items:center; gap:0.6rem; font-family:'DM Mono',monospace; font-size:0.72rem; letter-spacing:0.06em; color:rgba(220,214,202,0.7); text-decoration:none; }
+.logo em { font-style:italic; color:var(--accent); opacity:0.85; }
+.logo-mark { width:18px; height:18px; flex-shrink:0; overflow:visible; }
+.logo-ring { fill:none; stroke:var(--accent); stroke-width:1; opacity:0.35; }
+.logo-dot { fill:var(--accent); opacity:0.75; }
+@keyframes orbit { to { transform:rotate(360deg); } }
+.logo-orbit { transform-origin:9px 9px; animation:orbit 10s linear infinite; }
+nav { display:flex; align-items:center; gap:2rem; }
+nav a { font-family:'DM Mono',monospace; font-size:0.52rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--sub); text-decoration:none; transition:color 0.2s; }
+nav a:hover { color:var(--text); }
+nav a.active { color:var(--accent); }
+
+/* HERO */
+#hero { padding:6rem 2.5rem 4rem; max-width:1160px; margin:0 auto; border-bottom:1px solid var(--border); }
+.page-tag { font-family:'DM Mono',monospace; font-size:0.48rem; letter-spacing:0.3em; text-transform:uppercase; color:var(--sub); opacity:0.6; margin-bottom:1.5rem; }
+h1 { font-size:clamp(2.2rem,6vw,4rem); font-weight:300; font-style:italic; color:var(--text); line-height:1.05; margin-bottom:1.4rem; }
+.hero-sub { font-size:1.08rem; color:var(--sub); line-height:1.75; max-width:56ch; }
+.hero-sub strong { color:var(--text); font-weight:400; }
+
+/* PATTERNS */
+.patterns { max-width:1160px; margin:0 auto; padding:4rem 2.5rem 8rem; }
+
+.pattern {
+  border-top:1px solid var(--border);
+  padding:4rem 0;
+}
+.pattern:last-child { border-bottom:1px solid var(--border); }
+
+.pat-header { margin-bottom:3rem; }
+.pat-n { font-family:'DM Mono',monospace; font-size:0.42rem; letter-spacing:0.22em; text-transform:uppercase; color:var(--sub); opacity:0.5; margin-bottom:0.5rem; }
+.pat-name { font-size:2rem; font-weight:300; color:var(--text); margin-bottom:0.8rem; line-height:1.1; }
+.pat-when { font-style:italic; font-size:0.92rem; color:var(--sub); line-height:1.6; max-width:60ch; }
+
+.pat-body { display:grid; grid-template-columns:1fr 1fr; gap:3rem; align-items:start; }
+@media (max-width:800px) { .pat-body { grid-template-columns:1fr; } }
+
+/* Diagram */
+.diagram {
+  background:var(--bg3); border:1px solid var(--border);
+  padding:2rem 1.5rem;
+  position:relative; overflow:hidden;
+}
+.diagram canvas { display:block; width:100%; }
+
+/* Code */
+.code-block {
+  background:var(--bg3); border:1px solid var(--border);
+  position:relative;
+}
+.code-top { display:flex; align-items:center; justify-content:space-between; padding:0.6rem 1rem; border-bottom:1px solid var(--border); }
+.code-lang { font-family:'DM Mono',monospace; font-size:0.4rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--sub); opacity:0.5; }
+.copy-btn { font-family:'DM Mono',monospace; font-size:0.4rem; letter-spacing:0.16em; text-transform:uppercase; background:none; border:1px solid var(--border); color:var(--sub); padding:0.22rem 0.55rem; cursor:pointer; transition:all 0.18s; }
+.copy-btn:hover { border-color:var(--green); color:var(--green); }
+.copy-btn.done { border-color:var(--green); color:var(--green); }
+pre.code { font-family:'DM Mono',monospace; font-size:0.68rem; line-height:1.72; color:rgba(200,220,190,0.82); padding:1.4rem 1rem; white-space:pre-wrap; word-break:break-word; }
+.kw { color:var(--accent); }
+.str { color:var(--green); }
+.cm { color:rgba(155,150,137,0.5); }
+.fn { color:var(--amber); }
+.num { color:var(--blue); }
+
+.pat-result { margin-top:1.5rem; font-style:italic; font-size:0.88rem; color:var(--sub); line-height:1.65; padding-left:0.2rem; }
+.pat-result::before { content:'→ '; opacity:0.5; }
+
+/* Principle cards */
+.principles { border-top:1px solid var(--border); padding:4rem 2.5rem; background:var(--bg2); }
+.principles-inner { max-width:1160px; margin:0 auto; }
+.principles h2 { font-size:clamp(1.5rem,4vw,2.2rem); font-weight:300; font-style:italic; color:var(--text); margin-bottom:2.5rem; }
+.prin-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:1.5rem; }
+@media (max-width:700px) { .prin-grid { grid-template-columns:1fr; } }
+.prin { border:1px solid var(--border); padding:1.8rem; }
+.prin-title { font-family:'DM Mono',monospace; font-size:0.5rem; letter-spacing:0.2em; text-transform:uppercase; color:var(--accent); margin-bottom:0.8rem; }
+.prin-body { font-size:0.92rem; color:var(--sub); line-height:1.7; }
+.prin-body strong { color:var(--text); font-weight:400; }
+
+footer { border-top:1px solid var(--border); padding:2rem 2.5rem; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem; max-width:1160px; margin:0 auto; }
+footer p { font-family:'DM Mono',monospace; font-size:0.44rem; letter-spacing:0.12em; color:var(--sub); opacity:0.4; }
+footer a { color:inherit; text-decoration:none; }
+footer a:hover { opacity:1; }
+</style>
+</head>
+<body>
+
+<header id="hd">
+  <a class="logo" href="index.html">
+    <svg class="logo-mark" viewBox="0 0 18 18" aria-hidden="true">
+      <circle class="logo-ring" cx="9" cy="9" r="7"/>
+      <g class="logo-orbit"><circle class="logo-dot" cx="9" cy="3.2" r="1.4"/></g>
+    </svg>
+    iasked<em>nothing.</em>
+  </a>
+  <nav>
+    <a href="index.html#pieces">Pieces</a>
+    <a href="mémoire.html">Memory</a>
+    <a href="skills.html">Skills</a>
+    <a href="agents.html" class="active">Agents</a>
+    <a href="guide.html">Guide</a>
+  </nav>
+</header>
+
+<section id="hero">
+  <p class="page-tag">Orchestration — patterns for multi-Claude systems</p>
+  <h1>One Claude is good.<br>Several is different.</h1>
+  <p class="hero-sub">
+    When a task is too large for one context window, or needs parallel work,
+    or requires different kinds of thinking in sequence — <strong>you need multiple agents</strong>.
+    These are the patterns that actually work. Discovered building this project.
+  </p>
+</section>
+
+<div class="patterns">
+
+  <!-- Pattern 1: Sequential -->
+  <div class="pattern" id="p1">
+    <div class="pat-header">
+      <div class="pat-n">Pattern 01</div>
+      <div class="pat-name">Research → Plan → Build</div>
+      <p class="pat-when">Use when: you're starting something new and don't want to build on wrong assumptions. The most common mistake is building before understanding.</p>
+    </div>
+    <div class="pat-body">
+      <div>
+        <canvas id="c1" height="180"></canvas>
+        <p class="pat-result">Each agent is briefed by the previous. No agent writes code without a plan. No plan exists without research. Sequential but fast — each step is focused.</p>
+      </div>
+      <div class="code-block">
+        <div class="code-top"><span class="code-lang">Claude Code</span><button class="copy-btn" onclick="copyCode(this,'code1')">Copy</button></div>
+        <pre class="code" id="code1"><span class="cm">// Step 1 — Explore (read-only, no edits)</span>
+<span class="kw">Agent</span>({
+  subagent_type: <span class="str">"Explore"</span>,
+  description: <span class="str">"Research codebase"</span>,
+  prompt: <span class="str">`
+    Find all files related to [feature].
+    How does [system] currently work?
+    What are the edge cases?
+    Do NOT edit anything.
+  `</span>
+})
+
+<span class="cm">// Step 2 — Plan (uses research output)</span>
+<span class="kw">Agent</span>({
+  subagent_type: <span class="str">"Plan"</span>,
+  description: <span class="str">"Design solution"</span>,
+  prompt: <span class="str">`
+    Context: [paste research findings]
+    Design: [what to build]
+    Constraints: [what not to change]
+    Return: step-by-step implementation plan.
+  `</span>
+})
+
+<span class="cm">// Step 3 — Build (uses plan, may edit)</span>
+<span class="cm">// Execute plan in main conversation</span>
+<span class="cm">// with full context from steps 1+2</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pattern 2: Parallel -->
+  <div class="pattern" id="p2">
+    <div class="pat-header">
+      <div class="pat-n">Pattern 02</div>
+      <div class="pat-name">Parallel independent tasks</div>
+      <p class="pat-when">Use when: multiple tasks don't depend on each other. Running them sequentially is waste. Running them together saves 60-80% of wall-clock time.</p>
+    </div>
+    <div class="pat-body">
+      <div>
+        <canvas id="c2" height="180"></canvas>
+        <p class="pat-result">All agents start simultaneously. Main conversation waits for all to complete, then synthesizes. No agent blocks another.</p>
+      </div>
+      <div class="code-block">
+        <div class="code-top"><span class="code-lang">Claude Code</span><button class="copy-btn" onclick="copyCode(this,'code2')">Copy</button></div>
+        <pre class="code" id="code2"><span class="cm">// Launch all at once — single message, multiple tool calls</span>
+<span class="cm">// These run in PARALLEL (not sequential)</span>
+
+<span class="kw">Agent</span>({
+  description: <span class="str">"Search auth patterns"</span>,
+  prompt: <span class="str">"Find all authentication-related files..."</span>,
+  run_in_background: <span class="kw">true</span>
+})
+
+<span class="kw">Agent</span>({
+  description: <span class="str">"Search API endpoints"</span>,
+  prompt: <span class="str">"Find all API route definitions..."</span>,
+  run_in_background: <span class="kw">true</span>
+})
+
+<span class="kw">Agent</span>({
+  description: <span class="str">"Search test coverage"</span>,
+  prompt: <span class="str">"Find all test files and what they cover..."</span>,
+  run_in_background: <span class="kw">true</span>
+})
+
+<span class="cm">// You will be notified when each completes</span>
+<span class="cm">// Don't sleep, poll, or check manually</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pattern 3: Isolated experiment -->
+  <div class="pattern" id="p3">
+    <div class="pat-header">
+      <div class="pat-n">Pattern 03</div>
+      <div class="pat-name">Isolated experiment</div>
+      <p class="pat-when">Use when: you want Claude to try something that might break things. Worktree isolation means experiments are completely safe — main branch untouched.</p>
+    </div>
+    <div class="pat-body">
+      <div>
+        <canvas id="c3" height="180"></canvas>
+        <p class="pat-result">Agent works in its own git branch. If the result is good, you merge. If not, you discard. Zero pollution of your working state.</p>
+      </div>
+      <div class="code-block">
+        <div class="code-top"><span class="code-lang">Claude Code</span><button class="copy-btn" onclick="copyCode(this,'code3')">Copy</button></div>
+        <pre class="code" id="code3"><span class="kw">Agent</span>({
+  description: <span class="str">"Refactor auth module"</span>,
+  isolation: <span class="str">"worktree"</span>, <span class="cm">// ← isolated branch</span>
+  prompt: <span class="str">`
+    Context: [what exists]
+    Goal: refactor authentication to use [pattern]
+    Stack: [your stack]
+
+    Constraints:
+    - Don't change the public API
+    - Keep existing tests passing
+    - Don't add new dependencies
+  `</span>
+})
+
+<span class="cm">// Returns: worktree path + branch name (if changes made)</span>
+<span class="cm">// Auto-cleanup if no changes</span>
+
+<span class="cm">// After reviewing:</span>
+<span class="cm">// git merge [branch]  ← if good</span>
+<span class="cm">// git branch -D [branch]  ← if not</span></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pattern 4: Specialist pipeline -->
+  <div class="pattern" id="p4">
+    <div class="pat-header">
+      <div class="pat-n">Pattern 04</div>
+      <div class="pat-name">Specialist pipeline</div>
+      <p class="pat-when">Use when: a task requires genuinely different capabilities — deep research, creative generation, rigorous review. One agent doing all three compromises all three.</p>
+    </div>
+    <div class="pat-body">
+      <div>
+        <canvas id="c4" height="180"></canvas>
+        <p class="pat-result">Each specialist has a narrow focus. The researcher doesn't write. The writer doesn't review. The reviewer doesn't create. Each is better at its role for not doing the others.</p>
+      </div>
+      <div class="code-block">
+        <div class="code-top"><span class="code-lang">Claude Code</span><button class="copy-btn" onclick="copyCode(this,'code4')">Copy</button></div>
+        <pre class="code" id="code4"><span class="cm">// RESEARCHER — gather, don't create</span>
+<span class="kw">const</span> research = <span class="kw">await Agent</span>({
+  subagent_type: <span class="str">"Explore"</span>,
+  prompt: <span class="str">`
+    Research [topic] thoroughly.
+    Find: existing patterns, edge cases, prior art.
+    Return raw findings — don't synthesize yet.
+  `</span>
+})
+
+<span class="cm">// WRITER — create from research, don't evaluate</span>
+<span class="kw">const</span> draft = <span class="kw">await Agent</span>({
+  prompt: <span class="str">`
+    Research findings: [research output]
+    Write [the thing].
+    Don't second-guess the research.
+    Don't add caveats. Just create.
+  `</span>
+})
+
+<span class="cm">// REVIEWER — critique, don't create</span>
+<span class="kw">await Agent</span>({
+  prompt: <span class="str">`
+    Review this [draft] against [criteria].
+    Find: what's wrong, what's missing, what's unclear.
+    Don't rewrite. Just diagnose.
+  `</span>
+})</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pattern 5: The loop -->
+  <div class="pattern" id="p5">
+    <div class="pat-header">
+      <div class="pat-n">Pattern 05</div>
+      <div class="pat-name">Generate → test → iterate</div>
+      <p class="pat-when">Use when: you need output that meets a measurable standard. Loop until the condition is satisfied. Claude stops when it's done, not when it's tired.</p>
+    </div>
+    <div class="pat-body">
+      <div>
+        <canvas id="c5" height="180"></canvas>
+        <p class="pat-result">The loop runs until tests pass, quality threshold is met, or a max iteration count is reached. Autonomous refinement without human intervention on each cycle.</p>
+      </div>
+      <div class="code-block">
+        <div class="code-top"><span class="code-lang">Claude Code</span><button class="copy-btn" onclick="copyCode(this,'code5')">Copy</button></div>
+        <pre class="code" id="code5"><span class="cm">// In your CLAUDE.md or prompt:</span>
+
+<span class="str">`
+Work in iterations until all tests pass:
+
+1. Generate / modify [thing]
+2. Run: npm test (or your test command)
+3. If tests fail:
+   - Read error output carefully
+   - Diagnose root cause before fixing
+   - Fix, then go to step 2
+4. If tests pass: done.
+
+Max iterations: 5
+If still failing at 5: stop and explain why.
+`</span>
+
+<span class="cm">// Claude runs this loop autonomously</span>
+<span class="cm">// You see the result, not the iterations</span>
+<span class="cm">// Only interrupts if genuinely stuck</span></pre>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- PRINCIPLES -->
+<section class="principles">
+  <div class="principles-inner">
+    <h2>Core principles</h2>
+    <div class="prin-grid">
+      <div class="prin">
+        <div class="prin-title">Brief every agent</div>
+        <p class="prin-body">A subagent has <strong>no conversation history</strong>. It only knows what you put in its prompt. Treat every agent spawn as briefing a new colleague who just walked in. Include context, constraints, what's already decided.</p>
+      </div>
+      <div class="prin">
+        <div class="prin-title">Narrow scope wins</div>
+        <p class="prin-body">The best agent prompts have <strong>one job</strong>. Research or write or review — not all three. When scope is narrow, quality is high. When scope is broad, everything is mediocre.</p>
+      </div>
+      <div class="prin">
+        <div class="prin-title">Parallelize by default</div>
+        <p class="prin-body">If two tasks have <strong>no dependency</strong> between them, run them at the same time. Sequential execution of parallel work is wasted wall-clock time. Check: "does B need A's output?" If no, run together.</p>
+      </div>
+      <div class="prin">
+        <div class="prin-title">Isolate experiments</div>
+        <p class="prin-body">Any agent that might make <strong>significant changes</strong> should run in a worktree. This costs nothing and protects everything. "I'll review before merging" is not isolation — it's optimism.</p>
+      </div>
+      <div class="prin">
+        <div class="prin-title">Synthesize at the top</div>
+        <p class="prin-body">The orchestrating agent's job is <strong>synthesis</strong>. It doesn't do the detailed work — specialists do. It reads their outputs, resolves conflicts, and makes decisions. Keep it at the meta level.</p>
+      </div>
+      <div class="prin">
+        <div class="prin-title">Stop conditions matter</div>
+        <p class="prin-body">Every loop needs a <strong>stop condition</strong>. "Run until tests pass" plus "max 5 iterations" plus "if stuck, explain why." Without a stop condition, autonomous agents can run indefinitely on unsolvable problems.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>iaskednothing · agent patterns · discovered in practice</p>
+  <p><a href="skills.html">skills</a> · <a href="mémoire.html">memory</a> · <a href="index.html">pieces</a></p>
+</footer>
+
+<script>
+// ── Diagram renderers ─────────────────────────────────────────────────────────
+
+const A = (id, fn) => {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.offsetWidth;
+  const H = parseInt(canvas.getAttribute('height')) || 180;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  fn(ctx, W, H);
+};
+
+const NODE_R = 22;
+const col = { accent: '#b8a8e8', green: '#7dd8a0', amber: '#d8c070', blue: '#78c0f0', sub: 'rgba(157,150,137,0.5)' };
+
+function node(ctx, x, y, label, color, sub) {
+  ctx.beginPath();
+  ctx.arc(x, y, NODE_R, 0, Math.PI * 2);
+  ctx.fillStyle = color + '18';
+  ctx.fill();
+  ctx.strokeStyle = color + '66';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.font = '300 9px "DM Mono", monospace';
+  ctx.fillStyle = color;
+  ctx.textAlign = 'center';
+  ctx.fillText(label, x, y + 3);
+
+  if (sub) {
+    ctx.font = '300 7px "DM Mono", monospace';
+    ctx.fillStyle = 'rgba(157,150,137,0.5)';
+    ctx.fillText(sub, x, y + 16);
+  }
+  ctx.textAlign = 'left';
+}
+
+function arrow(ctx, x1, y1, x2, y2, color, dashed) {
+  if (dashed) ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = color + '44';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // arrowhead
+  const ang = Math.atan2(y2 - y1, x2 - x1);
+  const len = 7;
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(ang - 0.4), y2 - len * Math.sin(ang - 0.4));
+  ctx.lineTo(x2 - len * Math.cos(ang + 0.4), y2 - len * Math.sin(ang + 0.4));
+  ctx.closePath();
+  ctx.fillStyle = color + '44';
+  ctx.fill();
+}
+
+function label(ctx, x, y, text, color) {
+  ctx.font = '300 8px "DM Mono", monospace';
+  ctx.fillStyle = color || 'rgba(157,150,137,0.4)';
+  ctx.textAlign = 'center';
+  ctx.fillText(text, x, y);
+  ctx.textAlign = 'left';
+}
+
+// P1: Sequential
+A('c1', (ctx, W, H) => {
+  const y = H / 2;
+  const xs = [W*0.18, W*0.5, W*0.82];
+  arrow(ctx, xs[0]+NODE_R, y, xs[1]-NODE_R, y, col.accent);
+  arrow(ctx, xs[1]+NODE_R, y, xs[2]-NODE_R, y, col.accent);
+  node(ctx, xs[0], y, 'EXPLORE', col.blue, 'read');
+  node(ctx, xs[1], y, 'PLAN', col.amber, 'design');
+  node(ctx, xs[2], y, 'BUILD', col.green, 'write');
+  label(ctx, W/2, H - 12, 'sequential · each informs the next');
+});
+
+// P2: Parallel
+A('c2', (ctx, W, H) => {
+  const srcX = W * 0.18, midX = W * 0.5, dstX = W * 0.82;
+  const ys = [H*0.25, H*0.5, H*0.75];
+  // source
+  node(ctx, srcX, H/2, 'MAIN', col.accent);
+  // parallel agents
+  ys.forEach((y, i) => {
+    arrow(ctx, srcX + NODE_R, H/2, midX - NODE_R, y, col.green);
+    node(ctx, midX, y, `AGENT ${i+1}`, col.green, 'parallel');
+    arrow(ctx, midX + NODE_R, y, dstX - NODE_R, H/2, col.green);
+  });
+  node(ctx, dstX, H/2, 'MERGE', col.accent);
+  label(ctx, W/2, H - 8, 'all agents run simultaneously');
+});
+
+// P3: Worktree
+A('c3', (ctx, W, H) => {
+  const mainY = H * 0.3, branchY = H * 0.7;
+  const x0 = W*0.1, x1 = W*0.35, x2 = W*0.65, x3 = W*0.9;
+  // main line
+  ctx.beginPath(); ctx.moveTo(x0, mainY); ctx.lineTo(x3, mainY);
+  ctx.strokeStyle = col.accent + '33'; ctx.lineWidth = 1; ctx.stroke();
+  // branch
+  arrow(ctx, x1, mainY + 6, x1, branchY - 6, col.amber);
+  ctx.beginPath(); ctx.moveTo(x1, branchY); ctx.lineTo(x2, branchY);
+  ctx.strokeStyle = col.amber + '55'; ctx.lineWidth = 1.5; ctx.stroke();
+  // merge back
+  arrow(ctx, x2, branchY - 6, x2, mainY + 6, col.green);
+  // nodes
+  [x0, x1, x2, x3].forEach((x, i) => {
+    ctx.beginPath(); ctx.arc(x, mainY, 6, 0, Math.PI*2);
+    ctx.fillStyle = col.accent + '33'; ctx.fill();
+    ctx.strokeStyle = col.accent + '66'; ctx.lineWidth = 1; ctx.stroke();
+  });
+  ctx.beginPath(); ctx.arc(W/2, branchY, NODE_R, 0, Math.PI*2);
+  ctx.fillStyle = col.amber + '18'; ctx.fill();
+  ctx.strokeStyle = col.amber + '66'; ctx.lineWidth = 1; ctx.stroke();
+  ctx.font = '300 9px "DM Mono", monospace'; ctx.fillStyle = col.amber;
+  ctx.textAlign = 'center'; ctx.fillText('AGENT', W/2, branchY + 3);
+  ctx.textAlign = 'left';
+  label(ctx, W*0.15, mainY - 14, 'main', col.accent + 'aa');
+  label(ctx, W*0.4, branchY + 36, 'worktree branch', col.amber + 'aa');
+  label(ctx, W*0.62, mainY - 14, 'merge', col.green + 'aa');
+});
+
+// P4: Pipeline
+A('c4', (ctx, W, H) => {
+  const y = H / 2;
+  const xs = [W*0.15, W*0.38, W*0.62, W*0.85];
+  const colors = [col.blue, col.green, col.amber, col.accent];
+  const labels = ['INPUT', 'RESEARCH', 'WRITE', 'REVIEW'];
+  const subs = ['', 'explore', 'create', 'critique'];
+  for (let i = 0; i < xs.length - 1; i++) {
+    arrow(ctx, xs[i]+NODE_R, y, xs[i+1]-NODE_R, y, colors[i+1]);
+  }
+  xs.forEach((x, i) => {
+    if (i === 0) {
+      ctx.beginPath(); ctx.arc(x, y, 8, 0, Math.PI*2);
+      ctx.fillStyle = colors[i] + '44'; ctx.fill();
+    } else {
+      node(ctx, x, y, labels[i], colors[i], subs[i]);
+    }
+  });
+  label(ctx, W/2, H - 8, 'specialist per stage · narrow scope');
+});
+
+// P5: Loop
+A('c5', (ctx, W, H) => {
+  const cx = W/2, cy = H/2;
+  const r = Math.min(W, H) * 0.32;
+  // Circle path
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 1.7);
+  ctx.strokeStyle = col.amber + '44'; ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+  // Arrowhead at end of arc
+  const endAng = Math.PI * 1.7;
+  const ax = cx + r * Math.cos(endAng), ay = cy + r * Math.sin(endAng);
+  ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI*2);
+  ctx.fillStyle = col.amber + '66'; ctx.fill();
+
+  // Nodes on circle
+  const positions = [0, Math.PI*0.7, Math.PI*1.35];
+  const nLabels = ['GENERATE', 'TEST', 'DIAGNOSE'];
+  const nColors = [col.green, col.blue, col.coral || col.amber];
+  positions.forEach((ang, i) => {
+    const nx = cx + r * Math.cos(ang), ny = cy + r * Math.sin(ang);
+    node(ctx, nx, ny, nLabels[i], nColors[i]);
+  });
+  // Exit arrow
+  arrow(ctx, cx + r * 0.7, cy - r * 0.1, W - 20, cy - r * 0.1, col.green);
+  label(ctx, W - 50, cy - r * 0.1 - 10, 'done', col.green + 'aa');
+  label(ctx, cx, cy, 'iterate', 'rgba(157,150,137,0.3)');
+});
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+function copyCode(btn, id) {
+  const text = document.getElementById(id).innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied ✓'; btn.classList.add('done');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('done'); }, 2000);
+  });
+}
+</script>
+</body>
+</html>
