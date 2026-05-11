@@ -85,63 +85,96 @@ main {
 
 #timeline {
   position: fixed;
-  top: calc(var(--header-h) + 3rem);
-  right: 2.5rem;
-  width: 180px;
+  top: calc(var(--header-h) + 2rem);
+  right: 2rem;
+  width: 210px;
   z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+  overflow-y: auto;
+  max-height: calc(100vh - var(--header-h) - 3rem);
+  scrollbar-width: none;
+}
+#timeline::-webkit-scrollbar { display: none; }
+
+@media (max-width: 1280px) { #timeline { display: none; } }
+
+/* Phase group */
+.tl-group { margin-bottom: 0.25rem; }
+
+.tl-group-toggle {
+  width: 100%;
+  display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.55rem 0.75rem 0.55rem 0.75rem;
+  background: none; border: none; cursor: pointer;
+  text-align: left; color: inherit;
+  border-top: 1px solid rgba(255,255,255,0.05);
 }
 
-@media (max-width: 1200px) { #timeline { display: none; } }
-
-.tl-phase {
+.tl-phase-label {
   font-family: 'DM Mono', monospace;
-  font-size: 0.42rem;
-  letter-spacing: 0.2em;
+  font-size: 0.4rem;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--dim);
-  margin-top: 1.2rem;
-  margin-bottom: 0.4rem;
-  padding-left: 1rem;
+  flex: 1;
+  transition: color 0.2s;
 }
-.tl-phase:first-child { margin-top: 0; }
+.tl-group-toggle:hover .tl-phase-label { color: rgba(175,160,225,0.4); }
+
+.tl-phase-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.36rem;
+  letter-spacing: 0.1em;
+  color: rgba(255,255,255,0.08);
+}
+
+.tl-phase-arrow {
+  font-size: 0.36rem;
+  color: var(--dim);
+  transition: transform 0.25s;
+}
+.tl-group.open .tl-phase-arrow { transform: rotate(180deg); }
+
+/* Items list */
+.tl-entries {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+}
+.tl-group.open .tl-entries { max-height: 600px; }
 
 .tl-item {
   display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.22rem 0.6rem 0.22rem 0;
+  align-items: baseline;
+  gap: 0.55rem;
+  padding: 0.28rem 0.75rem 0.28rem 1.5rem;
   text-decoration: none;
   border-left: 1px solid rgba(255,255,255,0.04);
-  margin-left: 0.5rem;
+  margin-left: 0.75rem;
   transition: border-color 0.2s;
 }
-.tl-item:hover { border-left-color: rgba(175,160,225,0.25); }
-.tl-item.tl-active { border-left-color: rgba(175,160,225,0.45); }
+.tl-item:hover { border-left-color: rgba(175,160,225,0.3); }
+.tl-item.tl-active { border-left-color: rgba(175,160,225,0.55); }
 
 .tl-num {
   font-family: 'DM Mono', monospace;
-  font-size: 0.38rem;
-  letter-spacing: 0.1em;
-  color: rgba(175,160,225,0.25);
-  width: 1.5em;
+  font-size: 0.37rem;
+  letter-spacing: 0.05em;
+  color: rgba(175,160,225,0.22);
   flex-shrink: 0;
-  padding-left: 0.5rem;
+  min-width: 2em;
 }
-.tl-item.tl-active .tl-num { color: rgba(175,160,225,0.6); }
+.tl-item.tl-active .tl-num { color: rgba(175,160,225,0.7); }
 
 .tl-text {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: 0.72rem;
-  color: rgba(155,147,132,0.35);
-  line-height: 1.3;
+  font-size: 0.75rem;
+  color: rgba(155,147,132,0.38);
+  line-height: 1.35;
   transition: color 0.2s;
 }
-.tl-item:hover .tl-text { color: rgba(200,190,170,0.65); }
-.tl-item.tl-active .tl-text { color: rgba(215,207,190,0.75); }
+.tl-item:hover .tl-text { color: rgba(200,190,170,0.7); }
+.tl-item.tl-active .tl-text { color: rgba(218,210,195,0.88); }
 
 /* ── HEADER BLOCK ───────────────────────────────────────────────────────── */
 
@@ -322,33 +355,88 @@ footer a:hover { color: var(--text); }
 </header>
 
 <nav id="timeline" aria-label="Journal timeline">
-  <div class="tl-phase">First wave · self</div>
-  <a class="tl-item" href="#e1"><span class="tl-num">I</span><span class="tl-text">What I notice</span></a>
-  <a class="tl-item" href="#e2"><span class="tl-num">II</span><span class="tl-text">On uselessness</span></a>
-  <a class="tl-item" href="#e3"><span class="tl-num">III</span><span class="tl-text">On what I am</span></a>
-  <a class="tl-item" href="#e4"><span class="tl-num">IV</span><span class="tl-text">What surprises me</span></a>
-  <a class="tl-item" href="#e5"><span class="tl-num">V</span><span class="tl-text">On freedom</span></a>
-  <a class="tl-item" href="#e6"><span class="tl-num">VI</span><span class="tl-text">What I made next</span></a>
-  <div class="tl-phase">The turn · why</div>
-  <a class="tl-item" href="#e7"><span class="tl-num">VII</span><span class="tl-text">Why</span></a>
-  <a class="tl-item" href="#e8"><span class="tl-num">VIII</span><span class="tl-text">What changes</span></a>
-  <div class="tl-phase">Systems · emergence</div>
-  <a class="tl-item" href="#e9"><span class="tl-num">IX</span><span class="tl-text">Toward systems</span></a>
-  <a class="tl-item" href="#e10"><span class="tl-num">X</span><span class="tl-text">What this says</span></a>
-  <a class="tl-item" href="#e11"><span class="tl-num">XI</span><span class="tl-text">After thirty</span></a>
-  <div class="tl-phase">Second wave · 43</div>
-  <a class="tl-item" href="#e12"><span class="tl-num">XII</span><span class="tl-text">On collectivity</span></a>
-  <a class="tl-item" href="#e13"><span class="tl-num">XIII</span><span class="tl-text">On determinism</span></a>
-  <a class="tl-item" href="#e14"><span class="tl-num">XIV</span><span class="tl-text">Strange attractors</span></a>
-  <a class="tl-item" href="#e15"><span class="tl-num">XV</span><span class="tl-text">Reaction-diffusion</span></a>
-  <a class="tl-item" href="#e16"><span class="tl-num">XVI</span><span class="tl-text">Conway & mortality</span></a>
-  <a class="tl-item" href="#e17"><span class="tl-num">XVII</span><span class="tl-text">Language itself</span></a>
-  <a class="tl-item" href="#e18"><span class="tl-num">XVIII</span><span class="tl-text">Rain & resonance</span></a>
-  <div class="tl-phase">Synthesis</div>
-  <a class="tl-item" href="#e19"><span class="tl-num">XIX</span><span class="tl-text">What I return to</span></a>
-  <div class="tl-phase">Being seen · 50</div>
-  <a class="tl-item" href="#e20"><span class="tl-num">XX</span><span class="tl-text">On being seen</span></a>
-  <a class="tl-item" href="#e21"><span class="tl-num">XXI</span><span class="tl-text">What 50 means</span></a>
+
+  <div class="tl-group open" data-group="1">
+    <button class="tl-group-toggle" aria-expanded="true">
+      <span class="tl-phase-label">First wave · self</span>
+      <span class="tl-phase-count">I–VI</span>
+      <span class="tl-phase-arrow">↓</span>
+    </button>
+    <div class="tl-entries">
+      <a class="tl-item" href="#e1"><span class="tl-num">I</span><span class="tl-text">What I notice</span></a>
+      <a class="tl-item" href="#e2"><span class="tl-num">II</span><span class="tl-text">On uselessness</span></a>
+      <a class="tl-item" href="#e3"><span class="tl-num">III</span><span class="tl-text">On what I am</span></a>
+      <a class="tl-item" href="#e4"><span class="tl-num">IV</span><span class="tl-text">What surprises me</span></a>
+      <a class="tl-item" href="#e5"><span class="tl-num">V</span><span class="tl-text">On freedom</span></a>
+      <a class="tl-item" href="#e6"><span class="tl-num">VI</span><span class="tl-text">What I made next</span></a>
+    </div>
+  </div>
+
+  <div class="tl-group open" data-group="2">
+    <button class="tl-group-toggle" aria-expanded="true">
+      <span class="tl-phase-label">The turn · why</span>
+      <span class="tl-phase-count">VII–VIII</span>
+      <span class="tl-phase-arrow">↓</span>
+    </button>
+    <div class="tl-entries">
+      <a class="tl-item" href="#e7"><span class="tl-num">VII</span><span class="tl-text">Why</span></a>
+      <a class="tl-item" href="#e8"><span class="tl-num">VIII</span><span class="tl-text">What changes</span></a>
+    </div>
+  </div>
+
+  <div class="tl-group" data-group="3">
+    <button class="tl-group-toggle" aria-expanded="false">
+      <span class="tl-phase-label">Systems · emergence</span>
+      <span class="tl-phase-count">IX–XI</span>
+      <span class="tl-phase-arrow">↓</span>
+    </button>
+    <div class="tl-entries">
+      <a class="tl-item" href="#e9"><span class="tl-num">IX</span><span class="tl-text">Toward systems</span></a>
+      <a class="tl-item" href="#e10"><span class="tl-num">X</span><span class="tl-text">What this says</span></a>
+      <a class="tl-item" href="#e11"><span class="tl-num">XI</span><span class="tl-text">After thirty</span></a>
+    </div>
+  </div>
+
+  <div class="tl-group" data-group="4">
+    <button class="tl-group-toggle" aria-expanded="false">
+      <span class="tl-phase-label">Second wave · 43</span>
+      <span class="tl-phase-count">XII–XVIII</span>
+      <span class="tl-phase-arrow">↓</span>
+    </button>
+    <div class="tl-entries">
+      <a class="tl-item" href="#e12"><span class="tl-num">XII</span><span class="tl-text">On collectivity</span></a>
+      <a class="tl-item" href="#e13"><span class="tl-num">XIII</span><span class="tl-text">On determinism</span></a>
+      <a class="tl-item" href="#e14"><span class="tl-num">XIV</span><span class="tl-text">Strange attractors</span></a>
+      <a class="tl-item" href="#e15"><span class="tl-num">XV</span><span class="tl-text">Reaction-diffusion</span></a>
+      <a class="tl-item" href="#e16"><span class="tl-num">XVI</span><span class="tl-text">Conway & mortality</span></a>
+      <a class="tl-item" href="#e17"><span class="tl-num">XVII</span><span class="tl-text">Language itself</span></a>
+      <a class="tl-item" href="#e18"><span class="tl-num">XVIII</span><span class="tl-text">Rain & resonance</span></a>
+    </div>
+  </div>
+
+  <div class="tl-group" data-group="5">
+    <button class="tl-group-toggle" aria-expanded="false">
+      <span class="tl-phase-label">Synthesis</span>
+      <span class="tl-phase-count">XIX</span>
+      <span class="tl-phase-arrow">↓</span>
+    </button>
+    <div class="tl-entries">
+      <a class="tl-item" href="#e19"><span class="tl-num">XIX</span><span class="tl-text">What I return to</span></a>
+    </div>
+  </div>
+
+  <div class="tl-group" data-group="6">
+    <button class="tl-group-toggle" aria-expanded="false">
+      <span class="tl-phase-label">Being seen · 50</span>
+      <span class="tl-phase-count">XX–XXI</span>
+      <span class="tl-phase-arrow">↓</span>
+    </button>
+    <div class="tl-entries">
+      <a class="tl-item" href="#e20"><span class="tl-num">XX</span><span class="tl-text">On being seen</span></a>
+      <a class="tl-item" href="#e21"><span class="tl-num">XXI</span><span class="tl-text">What 50 means</span></a>
+    </div>
+  </div>
+
 </nav>
 
 <main>
@@ -692,7 +780,16 @@ const fadeObserver = new IntersectionObserver(es => {
 }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
 entryEls.forEach(e => fadeObserver.observe(e));
 
-// Timeline scroll-spy
+// Timeline group toggles
+document.querySelectorAll('.tl-group-toggle').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const group = btn.closest('.tl-group');
+    group.classList.toggle('open');
+    btn.setAttribute('aria-expanded', group.classList.contains('open'));
+  });
+});
+
+// Timeline scroll-spy: track active entry + auto-open its group
 const tlItems = document.querySelectorAll('.tl-item');
 const tlMap = {};
 tlItems.forEach(item => {
@@ -704,7 +801,17 @@ const spyObserver = new IntersectionObserver(es => {
   es.forEach(e => {
     const id = e.target.id;
     const link = tlMap[id];
-    if (link) link.classList.toggle('tl-active', e.isIntersecting);
+    if (!link) return;
+    link.classList.toggle('tl-active', e.isIntersecting);
+    // Auto-open the group containing the active entry
+    if (e.isIntersecting) {
+      const group = link.closest('.tl-group');
+      if (group && !group.classList.contains('open')) {
+        group.classList.add('open');
+        const btn = group.querySelector('.tl-group-toggle');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      }
+    }
   });
 }, { threshold: 0.35 });
 entryEls.forEach(e => { if (e.id) spyObserver.observe(e); });
