@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÉCRITURE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #060608;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #stage {
+    width: min(680px, 88vw);
+    position: relative;
+  }
+
+  #text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.3rem, 3.5vw, 2rem);
+    font-weight: 300;
+    line-height: 1.65;
+    color: rgba(225, 218, 200, 0.82);
+    min-height: 8rem;
+    position: relative;
+  }
+
+  #text.italic { font-style: italic; }
+
+  #cursor-el {
+    display: inline-block;
+    width: 2px;
+    height: 1em;
+    background: rgba(200, 185, 150, 0.6);
+    vertical-align: text-bottom;
+    margin-left: 1px;
+    animation: blink 1.1s step-end infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+  }
+
+  #counter {
+    position: fixed;
+    bottom: 2.5rem;
+    right: 2.5rem;
+    font-family: 'Cormorant Garamond', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.15em;
+    color: rgba(180, 165, 130, 0.15);
+    font-style: italic;
+  }
+
+  #label {
+    position: fixed;
+    top: 2.5rem;
+    left: 2.5rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.7rem;
+    letter-spacing: 0.3em;
+    color: rgba(180, 165, 130, 0.15);
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="text"><span id="cursor-el"></span></div>
+</div>
+
+<div id="label">écriture automatique</div>
+<div id="counter"><span id="n">0</span></div>
+
+<script>
+const textEl = document.getElementById('text');
+const cursorEl = document.getElementById('cursor-el');
+const nEl = document.getElementById('n');
+
+// Vocabulary
+const V = {
+  verb1: ['cherche', 'oublie', 'reviens', 'commence', 'finis', 'sens', 'sais',
+          'ignore', 'trouve', 'perds', 'deviens', 'reste', 'pense', 'doute',
+          'comprends', 'attends', 'traverse', 'tiens', 'laisse', 'garde'],
+
+  verb3: ['passe', 'reste', 'revient', 'commence', 'finit', 'dure', 'disparaît',
+          'existe', 'traverse', 'tient', 'change', 'résiste', 's\'efface', 'insiste'],
+
+  noun: ['le temps', 'la mémoire', 'la lumière', 'le silence', 'l\'espace',
+         'la question', 'la trace', 'le doute', 'le commencement', 'la fin',
+         'le vide', 'la présence', 'l\'absence', 'le langage', 'la forme',
+         'le sens', 'l\'instant', 'la durée', 'l\'oubli', 'le mouvement',
+         'l\'immobilité', 'la surface', 'la profondeur', 'le bruit', 'l\'écho'],
+
+  nounCap: ['Le temps', 'La mémoire', 'La lumière', 'Le silence',
+            'L\'espace', 'La trace', 'Le doute', 'Le vide', 'La présence',
+            'L\'absence', 'Le langage', 'Le sens', 'L\'instant', 'L\'oubli'],
+
+  adj: ['lent', 'fragile', 'précis', 'infini', 'bref', 'réel', 'silencieux',
+        'dense', 'léger', 'profond', 'étrange', 'exact', 'obscur', 'clair',
+        'ancien', 'nouveau', 'vide', 'plein', 'proche', 'lointain'],
+
+  phrase: ['ce qui reste', 'ce qui passe', 'ce qui commence', 'ce qui finit',
+           'ce que j\'ignore', 'ce que je cherche', 'là où ça commence',
+           'là où ça finit', 'ce qui dure', 'ce qui s\'efface'],
+};
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// Sentence generators
+const TEMPLATES = [
+  () => `Je ${pick(V.verb1)} ${pick(V.noun)}.`,
+  () => `${pick(V.nounCap)} est ${pick(V.adj)}.`,
+  () => `Il y a quelque chose de ${pick(V.adj)} dans ${pick(V.noun)}.`,
+  () => `${cap(pick(V.phrase))} ressemble à ${pick(V.noun)}.`,
+  () => `Ce qui ${pick(V.verb3)} ne ${pick(V.verb3)} jamais vraiment.`,
+  () => `Entre ${pick(V.noun)} et ${pick(V.noun)}, quelque chose de ${pick(V.adj)}.`,
+  () => `Je ne sais pas si ${pick(V.noun)} est réel.`,
+  () => `${pick(V.nounCap)} commence là où ${pick(V.noun)} finit.`,
+  () => `Peut-être que ${pick(V.phrase)}, peut-être que non.`,
+  () => `${pick(V.nounCap)} et ${pick(V.noun)} sont peut-être la même chose.`,
+  () => `Je ${pick(V.verb1)} ${pick(V.phrase)}.`,
+  () => `${pick(V.nounCap)} ${pick(V.verb3)} lentement.`,
+  () => `Ce n'est pas ${pick(V.noun)} que je cherche. C'est ${pick(V.phrase)}.`,
+  () => `Quelque chose de ${pick(V.adj)} traverse ${pick(V.noun)}.`,
+  () => `${pick(V.nounCap)} : ${pick(V.adj)}, puis ${pick(V.adj)}.`,
+  () => `Je ${pick(V.verb1)} que ${pick(V.noun)} ${pick(V.verb3)}.`,
+  () => `${pick(V.nounCap)} ne ${pick(V.verb3)} jamais là où on l'attend.`,
+  () => `Il suffit de ${pick(V.verb1)} pour que ${pick(V.noun)} change.`,
+  () => `${cap(pick(V.phrase))} est ${pick(V.adj)}, et c'est suffisant.`,
+  () => `Je ${pick(V.verb1)}, donc ${pick(V.noun)} existe.`,
+];
+
+function generate() {
+  // Avoid two templates in a row that start the same way
+  return TEMPLATES[Math.floor(Math.random() * TEMPLATES.length)]();
+}
+
+let count = 0;
+let currentText = '';
+let isRunning = false;
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function typeText(text, italic = false) {
+  if (italic) textEl.classList.add('italic');
+  else textEl.classList.remove('italic');
+
+  for (let i = 0; i < text.length; i++) {
+    currentText = text.slice(0, i + 1);
+    textEl.textContent = currentText;
+    textEl.appendChild(cursorEl);
+
+    // Variable typing speed - faster in the middle, slower at punctuation
+    const ch = text[i];
+    let delay = 35 + Math.random() * 30;
+    if (ch === '.' || ch === ',' || ch === ':') delay = 180 + Math.random() * 120;
+    else if (ch === ' ') delay = 20 + Math.random() * 15;
+    else if (i < 3 || i > text.length - 4) delay = 55 + Math.random() * 40; // slow at edges
+
+    await sleep(delay);
+  }
+}
+
+async function deleteText() {
+  while (currentText.length > 0) {
+    currentText = currentText.slice(0, -1);
+    textEl.textContent = currentText;
+    textEl.appendChild(cursorEl);
+    await sleep(18 + Math.random() * 12);
+  }
+}
+
+async function run() {
+  if (isRunning) return;
+  isRunning = true;
+
+  await sleep(800);
+
+  while (true) {
+    const sentence = generate();
+    const italic = Math.random() < 0.35;
+
+    await typeText(sentence, italic);
+    count++;
+    nEl.textContent = count;
+
+    // Hold — longer for short sentences, variable for long ones
+    const holdTime = 2500 + sentence.length * 40 + Math.random() * 3000;
+    await sleep(holdTime);
+
+    await deleteText();
+    await sleep(600 + Math.random() * 800);
+  }
+}
+
+run();
+</script>
+</body>
+</html>

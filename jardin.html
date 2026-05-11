@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARDIN</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=DM+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #030507;
+    overflow: hidden;
+    font-family: 'DM Mono', monospace;
+  }
+
+  canvas { position: fixed; inset: 0; display: block; }
+
+  #ui {
+    position: fixed;
+    bottom: 2.5rem;
+    left: 0; right: 0;
+    text-align: center;
+  }
+
+  #count {
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: rgba(160, 190, 160, 0.2);
+    text-transform: uppercase;
+  }
+
+  #new-plant {
+    margin-top: 0.5rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.85rem;
+    color: rgba(180, 200, 170, 0.0);
+    transition: color 2s ease, opacity 2s ease;
+  }
+
+  #new-plant.visible {
+    color: rgba(180, 200, 170, 0.35);
+  }
+
+  #date-planted {
+    position: fixed;
+    top: 2rem;
+    right: 2rem;
+    font-size: 0.55rem;
+    letter-spacing: 0.18em;
+    color: rgba(140, 170, 130, 0.12);
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="count">—</div>
+  <div id="new-plant" id="new-plant"></div>
+</div>
+<div id="date-planted">JARDIN</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', () => { resize(); redraw(); });
+
+// Plant types and their colors
+const PLANT_DEFS = [
+  { name: 'violette',  color: '#b4a0c8', flowerR: 4, branches: 2, lean: 0.2 },
+  { name: 'anémone',   color: '#c8a0a0', flowerR: 5, branches: 2, lean: -0.1 },
+  { name: 'digitale',  color: '#a0b8c0', flowerR: 3, branches: 3, lean: 0.05 },
+  { name: 'linaire',   color: '#c8c08a', flowerR: 3, branches: 2, lean: -0.2 },
+  { name: 'muguet',    color: '#d8e0d0', flowerR: 4, branches: 1, lean: 0.15 },
+  { name: 'scabieuse', color: '#a8c4a8', flowerR: 5, branches: 2, lean: 0.0 },
+  { name: 'jacinthe',  color: '#b8a8d8', flowerR: 3, branches: 4, lean: 0.08 },
+];
+
+// Seeded random
+function seededRand(seed) {
+  let s = seed;
+  return function() {
+    s = (s * 1664525 + 1013904223) & 0xffffffff;
+    return (s >>> 0) / 0xffffffff;
+  };
+}
+
+function drawStem(ctx, x, y, len, angle, depth, rand, def, alpha) {
+  if (depth === 0 || len < 3) {
+    // Flower
+    const r = def.flowerR * (0.7 + rand() * 0.6);
+    const petals = 5 + Math.floor(rand() * 3);
+
+    ctx.save();
+    ctx.globalAlpha = alpha * 0.85;
+
+    // Petals
+    for (let i = 0; i < petals; i++) {
+      const pa = (i / petals) * Math.PI * 2;
+      const pr = r * 0.7;
+      ctx.beginPath();
+      ctx.ellipse(
+        x + Math.cos(pa) * pr,
+        y + Math.sin(pa) * pr,
+        r * 0.55, r * 0.35,
+        pa, 0, Math.PI * 2
+      );
+      ctx.fillStyle = def.color;
+      ctx.fill();
+    }
+
+    // Center
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(240, 230, 200, 0.7)';
+    ctx.fill();
+
+    ctx.restore();
+    return;
+  }
+
+  const nx = x + Math.sin(angle) * len;
+  const ny = y - Math.cos(angle) * len;
+
+  ctx.save();
+  ctx.globalAlpha = alpha * (0.5 + depth * 0.15);
+  ctx.strokeStyle = def.color;
+  ctx.lineWidth = depth * 0.6;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x, y);
+  ctx.lineTo(nx, ny);
+  ctx.stroke();
+  ctx.restore();
+
+  const branches = depth === 1 ? 1 : (rand() < 0.5 ? 2 : 1);
+
+  for (let i = 0; i < branches; i++) {
+    const spread = 0.3 + rand() * 0.35;
+    const dir = i === 0 ? -1 : 1;
+    const newAngle = angle + dir * spread * (0.6 + rand() * 0.8);
+    drawStem(ctx, nx, ny, len * (0.55 + rand() * 0.2), newAngle, depth - 1, rand, def, alpha);
+  }
+}
+
+function drawPlant(ctx, plant, alpha = 1) {
+  const rand = seededRand(plant.seed);
+  const def = PLANT_DEFS[plant.type];
+  const h = plant.height;
+  const baseX = plant.x * W;
+  const baseY = H - 40;
+  const rootAngle = def.lean + (rand() - 0.5) * 0.2;
+
+  drawStem(ctx, baseX, baseY, h, rootAngle, plant.depth, rand, def, alpha);
+}
+
+// localStorage
+const KEY = 'jardin_v1';
+let plants = [];
+
+try {
+  plants = JSON.parse(localStorage.getItem(KEY) || '[]');
+} catch(e) { plants = []; }
+
+// Add one new plant this visit
+const now = new Date();
+const visitId = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+const alreadyVisited = plants.some(p => p.visitId === visitId);
+
+let newPlant = null;
+if (!alreadyVisited) {
+  const type = Math.floor(Math.random() * PLANT_DEFS.length);
+  newPlant = {
+    seed: Math.floor(Math.random() * 99999),
+    type,
+    x: 0.08 + Math.random() * 0.84,
+    height: 40 + Math.random() * 80,
+    depth: 3 + Math.floor(Math.random() * 2),
+    visitId,
+    date: `${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`,
+    name: PLANT_DEFS[type].name,
+  };
+  plants.push(newPlant);
+  try { localStorage.setItem(KEY, JSON.stringify(plants)); } catch(e) {}
+}
+
+// Draw ground line
+function drawGround() {
+  const y = H - 40;
+  const grd = ctx.createLinearGradient(0, y, W, y);
+  grd.addColorStop(0, 'transparent');
+  grd.addColorStop(0.2, 'rgba(100, 140, 100, 0.08)');
+  grd.addColorStop(0.8, 'rgba(100, 140, 100, 0.08)');
+  grd.addColorStop(1, 'transparent');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, y, W, 1);
+}
+
+function redraw() {
+  ctx.fillStyle = '#030507';
+  ctx.fillRect(0, 0, W, H);
+  drawGround();
+
+  // Draw all plants except new one
+  for (const p of plants) {
+    if (p === newPlant) continue;
+    drawPlant(ctx, p, 0.7);
+  }
+}
+
+// Animate new plant growing
+let growProgress = 0;
+let growing = newPlant !== null;
+
+function tick() {
+  redraw();
+
+  if (growing) {
+    growProgress = Math.min(1, growProgress + 0.008);
+    // Draw new plant with progressive alpha
+    if (newPlant) {
+      const alpha = growProgress * 0.85;
+      // Modify height temporarily
+      const savedH = newPlant.height;
+      newPlant.height = savedH * growProgress;
+      drawPlant(ctx, newPlant, alpha);
+      newPlant.height = savedH;
+    }
+    if (growProgress >= 1) growing = false;
+  } else if (newPlant) {
+    drawPlant(ctx, newPlant, 0.85);
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// UI
+const countEl = document.getElementById('count');
+const newPlantEl = document.getElementById('new-plant');
+
+countEl.textContent = `${plants.length} plante${plants.length > 1 ? 's' : ''}`;
+
+if (newPlant) {
+  setTimeout(() => {
+    newPlantEl.textContent = `une ${newPlant.name} a poussé`;
+    newPlantEl.classList.add('visible');
+    setTimeout(() => newPlantEl.classList.remove('visible'), 5000);
+  }, 2000);
+} else {
+  countEl.textContent = `${plants.length} plante${plants.length > 1 ? 's' : ''} · déjà visité aujourd\'hui`;
+}
+
+tick();
+</script>
+</body>
+</html>

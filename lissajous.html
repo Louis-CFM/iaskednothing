@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LISSAJOUS</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#04020a; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,150,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #ratio {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1.1rem; color:rgba(190,165,230,0.2);
+    letter-spacing:0.05em; pointer-events:none;
+    transition: color 1.2s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ratio"></div>
+<div id="label">LISSAJOUS · oscillations</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy, R;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W / 2; cy = H / 2;
+  R = Math.min(W, H) * 0.40;
+}
+resize(); addEventListener('resize', () => { resize(); nextFigure(); });
+
+// ─── Ratios to cycle through ──────────────────────────────────────────────────
+
+const RATIOS = [
+  [1, 1], [1, 2], [1, 3], [2, 3], [3, 4],
+  [3, 5], [4, 5], [5, 6], [2, 5], [3, 7],
+  [4, 7], [5, 8], [1, 4], [5, 7],
+];
+
+// Each figure completes after lcm(a,b) full cycles = lcm * 2π steps
+// Trace point count = ratio-dependent
+
+let ratioIdx = 0;
+let a = 1, b = 1;
+let delta = 0;         // phase shift (slowly changes)
+let deltaDrift = 0.003;
+
+// Trace state
+let traceT  = 0;       // current t parameter
+let traceStep = 0;     // how many steps done
+let totalSteps = 0;    // total steps for this figure
+let points = [];       // accumulated { x, y } for this figure
+
+let hueBase = 240;     // color base hue
+
+function figureSteps(a, b) {
+  // LCM(a,b) periods to close the figure
+  function gcd(x, y) { return y === 0 ? x : gcd(y, x % y); }
+  const l = (a * b) / gcd(a, b);
+  return l * 600; // ~600 points per period
+}
+
+function nextFigure() {
+  [a, b] = RATIOS[ratioIdx % RATIOS.length];
+  ratioIdx++;
+  totalSteps = figureSteps(a, b);
+  traceT = 0;
+  traceStep = 0;
+  points = [];
+  hueBase = (hueBase + 37) % 360;
+
+  const ratioEl = document.getElementById('ratio');
+  ratioEl.textContent = `${a} : ${b}`;
+  ratioEl.style.color = `hsla(${hueBase}, 60%, 70%, 0.28)`;
+
+  // Fade out old canvas
+  ctx.fillStyle = 'rgba(4,2,10,0.7)';
+  ctx.fillRect(0, 0, W, H);
+}
+
+nextFigure();
+
+// ─── Parametric equations ─────────────────────────────────────────────────────
+
+function lissajousXY(t) {
+  return {
+    x: cx + R * Math.sin(a * t + delta),
+    y: cy + R * Math.sin(b * t),
+  };
+}
+
+// ─── Draw loop ────────────────────────────────────────────────────────────────
+
+const STEPS_PER_FRAME = 12; // trace speed
+
+let frame = 0;
+let finishedAt = -1;
+
+function tick() {
+  frame++;
+
+  // Slow fade
+  ctx.fillStyle = 'rgba(4,2,10,0.04)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Phase drift
+  delta += deltaDrift * 0.3;
+
+  if (traceStep < totalSteps) {
+    for (let s = 0; s < STEPS_PER_FRAME && traceStep < totalSteps; s++) {
+      const dt = (Math.PI * 2) / (totalSteps / (a <= b ? b : a));
+      traceT += dt;
+      traceStep++;
+
+      const pt = lissajousXY(traceT);
+      points.push(pt);
+
+      if (points.length > 1) {
+        const prev = points[points.length - 2];
+        const curr = points[points.length - 1];
+
+        const t01 = traceStep / totalSteps;
+        const hue = (hueBase + t01 * 180) % 360;
+        const alpha = 0.55 + 0.35 * Math.sin(t01 * Math.PI);
+
+        ctx.beginPath();
+        ctx.moveTo(prev.x, prev.y);
+        ctx.lineTo(curr.x, curr.y);
+        ctx.strokeStyle = `hsla(${hue}, 70%, 70%, ${alpha})`;
+        ctx.lineWidth = 1.2 + Math.sin(t01 * Math.PI * 4) * 0.4;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+    }
+
+    // Current tip glow
+    const tip = points[points.length - 1];
+    if (tip) {
+      ctx.beginPath();
+      ctx.arc(tip.x, tip.y, 3, 0, Math.PI * 2);
+      ctx.fillStyle = `hsla(${hueBase}, 80%, 85%, 0.9)`;
+      ctx.fill();
+    }
+
+    if (traceStep >= totalSteps && finishedAt < 0) {
+      finishedAt = frame;
+    }
+  }
+
+  // After pause, next figure
+  if (finishedAt > 0 && frame - finishedAt > 100) {
+    finishedAt = -1;
+    nextFigure();
+  }
+
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+// Click: skip to next
+canvas.addEventListener('click', () => {
+  finishedAt = -1;
+  nextFigure();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LANGTON</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020208; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #hud {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    line-height:2.2; letter-spacing:0.15em;
+    color:rgba(180,165,220,0.2); pointer-events:none;
+  }
+  #hud span { color:rgba(220,195,150,0.35); }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,160,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #event {
+    position:fixed; top:50%; left:50%;
+    transform:translate(-50%,-50%);
+    font-family:'DM Mono',monospace; font-size:0.65rem;
+    letter-spacing:0.25em; color:rgba(220,200,150,0.0);
+    pointer-events:none; text-align:center;
+    transition:color 1.5s ease, opacity 2s ease;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  étapes: <span id="s-steps">0</span><br>
+  cellules: <span id="s-cells">0</span><br>
+  phase: <span id="s-phase">chaos</span>
+</div>
+<div id="event"></div>
+<div id="label">LANGTON · fourmi</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const CELL = 3; // px per cell
+let W, H, COLS, ROWS;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  COLS = Math.floor(W / CELL);
+  ROWS = Math.floor(H / CELL);
+}
+resize();
+addEventListener('resize', () => { resize(); init(); });
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let grid, visits; // Uint8Array for state, Uint32Array for visit count
+let ant = { x:0, y:0, dir:0 }; // dir: 0=up 1=right 2=down 3=left
+let steps = 0, blackCells = 0;
+let phase = 'chaos';
+let highwayDetected = false;
+
+function init() {
+  grid   = new Uint8Array(COLS * ROWS);
+  visits = new Uint32Array(COLS * ROWS);
+  ant = {
+    x: Math.floor(COLS / 2),
+    y: Math.floor(ROWS / 2),
+    dir: 0
+  };
+  steps = 0;
+  blackCells = 0;
+  phase = 'chaos';
+  highwayDetected = false;
+  ctx.fillStyle = '#020208';
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ─── Ant logic ────────────────────────────────────────────────────────────────
+
+const DX = [0, 1, 0, -1];
+const DY = [-1, 0, 1, 0];
+
+function step() {
+  const idx = ant.y * COLS + ant.x;
+  const state = grid[idx];
+
+  // Rule: white (0) → turn right, flip, advance
+  //       black (1) → turn left, flip, advance
+  if (state === 0) {
+    ant.dir = (ant.dir + 1) & 3; // right
+    grid[idx] = 1;
+    blackCells++;
+  } else {
+    ant.dir = (ant.dir + 3) & 3; // left
+    grid[idx] = 0;
+    blackCells--;
+  }
+
+  visits[idx]++;
+  ant.x = ((ant.x + DX[ant.dir]) + COLS) % COLS;
+  ant.y = ((ant.y + DY[ant.dir]) + ROWS) % ROWS;
+  steps++;
+}
+
+// ─── Color mapping ────────────────────────────────────────────────────────────
+
+function cellColor(state, visitCount) {
+  if (visitCount === 0) return null; // unvisited, skip
+
+  // Color based on visit count, with state as secondary factor
+  const v = Math.min(1, visitCount / 80);
+  const v2 = Math.min(1, visitCount / 400);
+
+  if (state === 0) {
+    // "White" cells: cool tones — unlit but visited
+    const r = Math.round(15  + v  * 40);
+    const g = Math.round(10  + v  * 25);
+    const b = Math.round(30  + v  * 60);
+    return `rgb(${r},${g},${b})`;
+  } else {
+    // "Black" cells: warm tones — the active pattern
+    const r = Math.round(60  + v  * 160 + v2 * 35);
+    const g = Math.round(40  + v  * 110 + v2 * 20);
+    const b = Math.round(20  + v  * 40);
+    return `rgb(${r},${g},${b})`;
+  }
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+let dirty = new Set(); // cells to redraw
+
+function draw() {
+  // Redraw dirty cells
+  for (const idx of dirty) {
+    const cx2 = (idx % COLS) * CELL;
+    const cy2 = Math.floor(idx / COLS) * CELL;
+    const col = cellColor(grid[idx], visits[idx]);
+    if (col) {
+      ctx.fillStyle = col;
+      ctx.fillRect(cx2, cy2, CELL, CELL);
+    } else {
+      ctx.fillStyle = '#020208';
+      ctx.fillRect(cx2, cy2, CELL, CELL);
+    }
+  }
+  dirty.clear();
+
+  // Draw ant
+  ctx.fillStyle = 'rgba(255, 240, 200, 0.9)';
+  ctx.fillRect(ant.x * CELL, ant.y * CELL, CELL, CELL);
+}
+
+// ─── Highway detection ────────────────────────────────────────────────────────
+// Langton's ant creates a "highway" (repeating diagonal pattern) after ~10k steps.
+// We detect it by checking if blackCells grows monotonically for a while.
+
+let prevBlack = 0;
+let monotoneCount = 0;
+
+function checkHighway() {
+  if (highwayDetected) return;
+  if (steps < 8000) return;
+
+  if (blackCells > prevBlack) monotoneCount++;
+  else monotoneCount = 0;
+
+  prevBlack = blackCells;
+
+  if (monotoneCount > 300) {
+    highwayDetected = true;
+    phase = 'autoroute';
+    const ev = document.getElementById('event');
+    ev.textContent = 'structure émergente';
+    ev.style.color = 'rgba(220,200,150,0.5)';
+    ev.style.opacity = '1';
+    setTimeout(() => { ev.style.opacity = '0'; }, 4000);
+  }
+}
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+
+const STEPS_FAST   = 800;  // steps per frame while chaotic
+const STEPS_HIGHWAY = 200; // slower when highway forms (let you see it)
+
+let frameCount = 0;
+
+function frame() {
+  const stepsThisFrame = highwayDetected ? STEPS_HIGHWAY : STEPS_FAST;
+  const prevAnt = { x: ant.x, y: ant.y };
+
+  for (let i = 0; i < stepsThisFrame; i++) {
+    const prevIdx = ant.y * COLS + ant.x;
+    step();
+    const newIdx = ant.y * COLS + ant.x;
+    dirty.add(prevIdx);
+    dirty.add(newIdx);
+  }
+
+  draw();
+  checkHighway();
+
+  if (frameCount % 20 === 0) {
+    document.getElementById('s-steps').textContent = steps.toLocaleString('fr-FR');
+    document.getElementById('s-cells').textContent = blackCells.toLocaleString('fr-FR');
+    document.getElementById('s-phase').textContent = phase;
+  }
+
+  frameCount++;
+  requestAnimationFrame(frame);
+}
+
+init();
+requestAnimationFrame(frame);
+
+// Click: restart
+canvas.addEventListener('dblclick', () => { init(); });
+</script>
+</body>
+</html>

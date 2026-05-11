@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÉCOLOGIE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; background:#030508; overflow:hidden; }
+  canvas { display:block; }
+  #hud {
+    position:fixed; top:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.6rem;
+    letter-spacing:0.12em; line-height:2.2;
+    pointer-events:none;
+  }
+  .row { display:flex; align-items:center; gap:0.7rem; }
+  .dot { width:7px; height:7px; border-radius:50%; display:inline-block; }
+  .cnt { color:rgba(180,175,165,0.35); }
+  #gen { color:rgba(140,130,110,0.2); margin-top:0.4rem; }
+  #msg {
+    position:fixed; bottom:2.5rem; left:50%;
+    transform:translateX(-50%);
+    font-family:'DM Mono',monospace; font-size:0.6rem;
+    letter-spacing:0.18em; color:rgba(180,170,150,0.2);
+    text-transform:uppercase; pointer-events:none;
+    transition:opacity 1.5s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div class="row"><span class="dot" style="background:rgba(120,200,120,0.7)"></span><span class="cnt" id="cnt-p">—</span> plantes</div>
+  <div class="row"><span class="dot" style="background:rgba(100,175,220,0.7)"></span><span class="cnt" id="cnt-h">—</span> herbivores</div>
+  <div class="row"><span class="dot" style="background:rgba(220,140,80,0.7)"></span><span class="cnt" id="cnt-r">—</span> prédateurs</div>
+  <div id="gen">génération <span id="gen-n">0</span></div>
+</div>
+<div id="msg" id="msg">cliquer pour ajouter des herbivores</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Entity types ──────────────────────────────────────────────────────────────
+const TYPE = { PLANT: 0, HERB: 1, PRED: 2 };
+
+const CFG = {
+  plant: {
+    color: [100, 210, 120],
+    maxE: 80, growRate: 0.18,
+    reprodE: 75, reprodCost: 35,
+    maxPop: 160, spawnR: 55,
+    radius: e => 2 + e / 80 * 5,
+  },
+  herb: {
+    color: [90, 170, 220],
+    maxE: 100, speed: 0.8,
+    eatRange: 14, eatGain: 45,
+    hungerRate: 0.09,
+    reprodE: 88, reprodCost: 44,
+    maxPop: 80,
+    radius: e => 4 + e / 100 * 5,
+  },
+  pred: {
+    color: [230, 140, 70],
+    maxE: 130, speed: 1.25,
+    eatRange: 16, eatGain: 70,
+    hungerRate: 0.12,
+    reprodE: 115, reprodCost: 60,
+    maxPop: 30,
+    radius: e => 5 + e / 130 * 6,
+  },
+};
+
+class Entity {
+  constructor(type, x, y, e) {
+    this.type = type;
+    this.x = x ?? (20 + Math.random() * (W - 40));
+    this.y = y ?? (20 + Math.random() * (H - 40));
+    this.e = e ?? (30 + Math.random() * 40);
+    this.vx = 0; this.vy = 0;
+    this.alpha = 0; // fade in
+    this.dead = false;
+    this.age = 0;
+    this.target = null;
+  }
+
+  cfg() {
+    return this.type === TYPE.PLANT ? CFG.plant :
+           this.type === TYPE.HERB  ? CFG.herb  : CFG.pred;
+  }
+
+  color() {
+    const [r,g,b] = this.cfg().color;
+    const a = this.alpha * (0.6 + this.e / this.cfg().maxE * 0.35);
+    return `rgba(${r},${g},${b},${a})`;
+  }
+
+  glow() {
+    const [r,g,b] = this.cfg().color;
+    return `rgba(${r},${g},${b},${this.alpha * 0.12})`;
+  }
+
+  radius() { return this.cfg().radius(this.e); }
+
+  draw() {
+    const rad = this.radius();
+    // Glow
+    const g = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, rad * 3.5);
+    g.addColorStop(0, this.glow());
+    g.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, rad * 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Core
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = this.color();
+    ctx.fill();
+  }
+
+  update(plants, herbs, preds, spawn) {
+    this.age++;
+    this.alpha = Math.min(1, this.alpha + 0.04);
+
+    if (this.type === TYPE.PLANT) {
+      this.e = Math.min(this.cfg().maxE, this.e + this.cfg().growRate);
+      // Reproduce
+      if (this.e >= this.cfg().reprodE && plants.length < this.cfg().maxPop) {
+        this.e -= this.cfg().reprodCost;
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 15 + Math.random() * this.cfg().spawnR;
+        spawn(new Entity(TYPE.PLANT,
+          Math.max(10, Math.min(W-10, this.x + Math.cos(angle)*dist)),
+          Math.max(10, Math.min(H-10, this.y + Math.sin(angle)*dist)),
+          20
+        ));
+      }
+      if (this.e <= 0) this.dead = true;
+      return;
+    }
+
+    // Hunger
+    this.e -= this.cfg().hungerRate;
+    if (this.e <= 0) { this.dead = true; return; }
+
+    // Find target
+    let pool = this.type === TYPE.HERB ? plants : herbs;
+    let nearest = null, nearDist = Infinity;
+    for (const t of pool) {
+      if (t.dead) continue;
+      const d = Math.hypot(this.x-t.x, this.y-t.y);
+      if (d < nearDist) { nearDist = d; nearest = t; }
+    }
+
+    // Eat
+    if (nearest && nearDist < this.cfg().eatRange + nearest.radius()) {
+      nearest.dead = true;
+      this.e = Math.min(this.cfg().maxE, this.e + this.cfg().eatGain);
+      this.target = null;
+    } else if (nearest) {
+      this.target = nearest;
+    }
+
+    // Move toward target
+    if (this.target && !this.target.dead) {
+      const dx = this.target.x - this.x;
+      const dy = this.target.y - this.y;
+      const d = Math.hypot(dx, dy);
+      if (d > 1) {
+        this.vx += dx / d * 0.25;
+        this.vy += dy / d * 0.25;
+      }
+    } else {
+      // Wander
+      this.vx += (Math.random() - 0.5) * 0.4;
+      this.vy += (Math.random() - 0.5) * 0.4;
+    }
+
+    // Separation from same type
+    const samePool = this.type === TYPE.HERB ? herbs : preds;
+    for (const o of samePool) {
+      if (o === this || o.dead) continue;
+      const dx = this.x - o.x;
+      const dy = this.y - o.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 20 && d > 0.1) {
+        const f = (20 - d) / 20;
+        this.vx += dx / d * f * 0.3;
+        this.vy += dy / d * f * 0.3;
+      }
+    }
+
+    // Damping
+    const spd = this.cfg().speed;
+    this.vx *= 0.88;
+    this.vy *= 0.88;
+    const v = Math.hypot(this.vx, this.vy);
+    if (v > spd) { this.vx = this.vx/v*spd; this.vy = this.vy/v*spd; }
+
+    this.x = Math.max(8, Math.min(W-8, this.x + this.vx));
+    this.y = Math.max(8, Math.min(H-8, this.y + this.vy));
+
+    // Reproduce
+    const maxPop = this.cfg().maxPop;
+    const myPool = this.type === TYPE.HERB ? herbs : preds;
+    if (this.e >= this.cfg().reprodE && myPool.length < maxPop) {
+      this.e -= this.cfg().reprodCost;
+      spawn(new Entity(this.type,
+        this.x + (Math.random()-0.5)*20,
+        this.y + (Math.random()-0.5)*20,
+        this.e * 0.5
+      ));
+    }
+  }
+}
+
+// ── World state ───────────────────────────────────────────────────────────────
+let plants = [], herbs = [], preds = [];
+let generation = 0, frame = 0;
+
+function init() {
+  plants = Array.from({length: 90}, () => new Entity(TYPE.PLANT));
+  herbs  = Array.from({length: 22}, () => new Entity(TYPE.HERB));
+  preds  = Array.from({length: 6},  () => new Entity(TYPE.PRED));
+}
+init();
+
+// Respawn if extinction
+function checkExtinction() {
+  if (herbs.length === 0 && preds.length === 0) {
+    // Restart softly
+    herbs = Array.from({length: 15}, () => new Entity(TYPE.HERB));
+    preds = Array.from({length: 4},  () => new Entity(TYPE.PRED));
+    generation++;
+  } else if (plants.length < 8) {
+    for (let i = 0; i < 20; i++) plants.push(new Entity(TYPE.PLANT));
+  } else if (herbs.length === 0 && preds.length > 0) {
+    herbs = Array.from({length: 10}, () => new Entity(TYPE.HERB));
+  }
+}
+
+// Click to add herbivores
+canvas.addEventListener('click', e => {
+  for (let i = 0; i < 4; i++) {
+    herbs.push(new Entity(TYPE.HERB,
+      e.clientX + (Math.random()-0.5)*40,
+      e.clientY + (Math.random()-0.5)*40,
+      60
+    ));
+  }
+  document.getElementById('msg').style.opacity = '0';
+});
+
+// ── Render loop ───────────────────────────────────────────────────────────────
+function tick() {
+  frame++;
+
+  // Slow trail fade
+  ctx.fillStyle = 'rgba(3,5,8,0.22)';
+  ctx.fillRect(0, 0, W, H);
+
+  const toSpawn = [];
+  const spawnFn = e => toSpawn.push(e);
+
+  // Update & draw
+  const allArrays = [[plants, TYPE.PLANT], [herbs, TYPE.HERB], [preds, TYPE.PRED]];
+
+  for (const [arr, type] of allArrays) {
+    for (const e of arr) {
+      e.update(plants, herbs, preds, spawnFn);
+    }
+    // Draw
+    for (const e of arr) {
+      if (!e.dead) e.draw();
+    }
+    // Remove dead
+    let i = arr.length;
+    while (i--) { if (arr[i].dead) arr.splice(i, 1); }
+  }
+
+  // Spawn new
+  for (const e of toSpawn) {
+    if (e.type === TYPE.PLANT) plants.push(e);
+    else if (e.type === TYPE.HERB) herbs.push(e);
+    else preds.push(e);
+  }
+
+  // Extinction check every 3s
+  if (frame % 180 === 0) checkExtinction();
+
+  // HUD
+  if (frame % 15 === 0) {
+    document.getElementById('cnt-p').textContent = plants.length;
+    document.getElementById('cnt-h').textContent = herbs.length;
+    document.getElementById('cnt-r').textContent = preds.length;
+    document.getElementById('gen-n').textContent = generation;
+  }
+
+  requestAnimationFrame(tick);
+}
+
+tick();
+</script>
+</body>
+</html>

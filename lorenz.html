@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LORENZ</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020209; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(150,170,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #sub {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.12em; line-height:2; color:rgba(150,165,210,0.18);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="sub">
+  attracteur étrange · σ=10 ρ=28 β=8/3<br>
+  trajectoires sensibles aux conditions initiales
+</div>
+<div id="label">LORENZ</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ─── Lorenz parameters ───────────────────────────────────────────────────────
+const σ = 10, ρ = 28, β = 8/3;
+
+// ─── RK4 integration ─────────────────────────────────────────────────────────
+function dxdt(x, y, z) { return σ * (y - x); }
+function dydt(x, y, z) { return x * (ρ - z) - y; }
+function dzdt(x, y, z) { return x * y - β * z; }
+
+function rk4(x, y, z, dt) {
+  const k1x = dxdt(x,y,z),       k1y = dydt(x,y,z),       k1z = dzdt(x,y,z);
+  const k2x = dxdt(x+k1x*dt/2, y+k1y*dt/2, z+k1z*dt/2);
+  const k2y = dydt(x+k1x*dt/2, y+k1y*dt/2, z+k1z*dt/2);
+  const k2z = dzdt(x+k1x*dt/2, y+k1y*dt/2, z+k1z*dt/2);
+  const k3x = dxdt(x+k2x*dt/2, y+k2y*dt/2, z+k2z*dt/2);
+  const k3y = dydt(x+k2x*dt/2, y+k2y*dt/2, z+k2z*dt/2);
+  const k3z = dzdt(x+k2x*dt/2, y+k2y*dt/2, z+k2z*dt/2);
+  const k4x = dxdt(x+k3x*dt, y+k3y*dt, z+k3z*dt);
+  const k4y = dydt(x+k3x*dt, y+k3y*dt, z+k3z*dt);
+  const k4z = dzdt(x+k3x*dt, y+k3y*dt, z+k3z*dt);
+  return {
+    x: x + (k1x + 2*k2x + 2*k3x + k4x) * dt / 6,
+    y: y + (k1y + 2*k2y + 2*k3y + k4y) * dt / 6,
+    z: z + (k1z + 2*k2z + 2*k3z + k4z) * dt / 6,
+  };
+}
+
+// ─── Multiple trajectories ────────────────────────────────────────────────────
+// Start near each other — show sensitivity to initial conditions
+
+const N_TRAJ = 4;
+const HISTORY = 2200;
+const DT = 0.008;
+const STEPS_PER_FRAME = 4;
+
+const PALETTE = [
+  { h: 220, s: 70, l: 65 }, // cool blue
+  { h: 280, s: 60, l: 60 }, // purple
+  { h: 40,  s: 80, l: 65 }, // warm amber
+  { h: 170, s: 60, l: 55 }, // teal
+];
+
+const trajectories = Array.from({ length: N_TRAJ }, (_, i) => ({
+  x: 0.01 + i * 0.00001, // tiny differences → diverge completely
+  y: 0.01,
+  z: 20 + i * 0.00001,
+  history: [], // { x, y, z }
+  hue: PALETTE[i].h,
+  sat: PALETTE[i].s,
+  lit: PALETTE[i].l,
+}));
+
+// ─── 3D projection ────────────────────────────────────────────────────────────
+
+function project(x, y, z, rotY, rotX, scale, cx, cy) {
+  // Rotate Y
+  const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+  const rx = x * cosY - y * sinY;
+  const ry = y * cosY + x * sinY;
+  // Rotate X
+  const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+  const rz = z * cosX - ry * sinX;
+  const ry2 = ry * cosX + z * sinX;
+
+  // Perspective
+  const fov = 2.5;
+  const pz = fov + rz * 0.012;
+  const sx = cx + rx * scale / pz;
+  const sy = cy - ry2 * scale / pz;
+
+  return { sx, sy, depth: pz };
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+let frame = 0;
+const t0 = performance.now();
+
+function tick(ts) {
+  const t = (ts - t0) / 1000;
+
+  // Advance trajectories
+  for (const traj of trajectories) {
+    for (let s = 0; s < STEPS_PER_FRAME; s++) {
+      const next = rk4(traj.x, traj.y, traj.z, DT);
+      traj.x = next.x; traj.y = next.y; traj.z = next.z;
+      traj.history.push({ x: traj.x, y: traj.y, z: traj.z });
+      if (traj.history.length > HISTORY) traj.history.shift();
+    }
+  }
+
+  // Fading trail background
+  ctx.fillStyle = 'rgba(2,2,9,0.12)';
+  ctx.fillRect(0, 0, W, H);
+
+  const rotY = t * 0.12;
+  const rotX = 0.25 + Math.sin(t * 0.07) * 0.08;
+  const scale = Math.min(W, H) * 0.28;
+  const cx = W / 2, cy = H / 2 - 20;
+
+  // Draw each trajectory
+  for (const traj of trajectories) {
+    const hist = traj.history;
+    if (hist.length < 2) continue;
+
+    for (let i = 1; i < hist.length; i++) {
+      const a = hist[i-1], b = hist[i];
+      const pa = project(a.x, a.y, a.z - 25, rotY, rotX, scale, cx, cy);
+      const pb = project(b.x, b.y, b.z - 25, rotY, rotX, scale, cx, cy);
+
+      const progress = i / hist.length;
+      const alpha = progress * 0.55 * (0.3 + progress * 0.7);
+      const brightness = traj.lit + (b.z / 50 - 0.5) * 15;
+
+      ctx.beginPath();
+      ctx.moveTo(pa.sx, pa.sy);
+      ctx.lineTo(pb.sx, pb.sy);
+      ctx.strokeStyle = `hsla(${traj.hue},${traj.sat}%,${brightness}%,${alpha})`;
+      ctx.lineWidth = 0.7 + progress * 0.6;
+      ctx.stroke();
+    }
+
+    // Current point glow
+    const cur = hist[hist.length - 1];
+    const pc = project(cur.x, cur.y, cur.z - 25, rotY, rotX, scale, cx, cy);
+    ctx.beginPath();
+    ctx.arc(pc.sx, pc.sy, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${traj.hue},80%,85%,0.85)`;
+    ctx.fill();
+  }
+
+  frame++;
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

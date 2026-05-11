@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EFFACEMENT</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #050508;
+    overflow: hidden;
+    cursor: text;
+  }
+
+  #stage {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem;
+  }
+
+  #text-area {
+    width: min(680px, 88vw);
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+    font-weight: 300;
+    line-height: 1.9;
+    letter-spacing: 0.01em;
+    color: rgba(220, 210, 190, 0.85);
+    min-height: 4em;
+    word-break: break-word;
+    user-select: none;
+    position: relative;
+  }
+
+  .char {
+    display: inline;
+    transition: opacity 0.8s ease, color 1.2s ease;
+    opacity: 1;
+    white-space: pre-wrap;
+  }
+
+  .char.fading {
+    opacity: 0.3;
+    color: rgba(180, 165, 140, 0.4);
+  }
+
+  .char.gone {
+    opacity: 0;
+  }
+
+  #cursor {
+    display: inline-block;
+    width: 2px;
+    height: 1.1em;
+    background: rgba(200, 185, 150, 0.5);
+    vertical-align: text-bottom;
+    animation: blink 1.1s step-end infinite;
+    margin-left: 1px;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 0; }
+  }
+
+  #label {
+    position: fixed;
+    top: 2.5rem;
+    left: 2.5rem;
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.75rem;
+    color: rgba(160, 145, 120, 0.18);
+    letter-spacing: 0.12em;
+  }
+
+  #hint {
+    position: fixed;
+    bottom: 2.5rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 0.8rem;
+    color: rgba(160, 148, 125, 0.2);
+    white-space: nowrap;
+    transition: opacity 2s ease;
+    text-align: center;
+  }
+
+  #hint.hidden { opacity: 0; }
+
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(5,5,8,0.5) 100%);
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="label">écrire dans l'eau</div>
+<div id="stage">
+  <div id="text-area"><span id="cursor"></span></div>
+</div>
+<div id="hint">commence à écrire · les mots disparaîtront</div>
+
+<script>
+const textArea = document.getElementById('text-area');
+const cursorEl = document.getElementById('cursor');
+const hint = document.getElementById('hint');
+
+const FADE_AFTER = 9000;  // ms before fading starts
+const GONE_AFTER = 11500; // ms before fully gone
+
+let chars = []; // { el, timestamp, state }
+let hasTyped = false;
+
+function addChar(ch) {
+  const el = document.createElement('span');
+  el.className = 'char';
+  el.textContent = ch;
+  textArea.insertBefore(el, cursorEl);
+  chars.push({ el, timestamp: Date.now(), state: 'visible' });
+
+  if (!hasTyped) {
+    hasTyped = true;
+    hint.classList.add('hidden');
+  }
+}
+
+function removeLastChar() {
+  if (chars.length === 0) return;
+  // Find the last non-gone char
+  for (let i = chars.length - 1; i >= 0; i--) {
+    if (chars[i].state !== 'gone') {
+      chars[i].el.remove();
+      chars.splice(i, 1);
+      return;
+    }
+  }
+}
+
+window.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+  if (e.key === 'Backspace') {
+    e.preventDefault();
+    removeLastChar();
+    return;
+  }
+
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    addChar('\n');
+    return;
+  }
+
+  if (e.key.length === 1) {
+    e.preventDefault();
+    addChar(e.key);
+  }
+});
+
+// Also handle mobile
+window.addEventListener('touchstart', () => {
+  // Create hidden input for mobile keyboards
+  let input = document.getElementById('hidden-input');
+  if (!input) {
+    input = document.createElement('input');
+    input.id = 'hidden-input';
+    input.style.cssText = 'position:fixed;opacity:0;top:-100px;left:0;width:1px;height:1px;';
+    document.body.appendChild(input);
+    input.addEventListener('input', () => {
+      for (const ch of input.value) addChar(ch);
+      input.value = '';
+    });
+  }
+  input.focus();
+});
+
+// Fade loop
+function fadeTick() {
+  const now = Date.now();
+  for (let i = chars.length - 1; i >= 0; i--) {
+    const c = chars[i];
+    const age = now - c.timestamp;
+
+    if (c.state === 'visible' && age > FADE_AFTER) {
+      c.state = 'fading';
+      c.el.classList.add('fading');
+    }
+
+    if (c.state === 'fading' && age > GONE_AFTER) {
+      c.state = 'gone';
+      c.el.classList.add('gone');
+      // Remove from DOM after transition
+      setTimeout(() => {
+        c.el.remove();
+      }, 1200);
+    }
+  }
+
+  // Clean up gone chars from array
+  for (let i = chars.length - 1; i >= 0; i--) {
+    if (chars[i].state === 'gone' && !chars[i].el.parentNode) {
+      chars.splice(i, 1);
+    }
+  }
+
+  requestAnimationFrame(fadeTick);
+}
+
+fadeTick();
+
+// Focus state
+window.addEventListener('click', () => {
+  const input = document.getElementById('hidden-input');
+  if (input) input.focus();
+});
+</script>
+</body>
+</html>

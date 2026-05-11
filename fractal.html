@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FRACTAL</title>
+<style>
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#02010a; overflow:hidden; cursor:crosshair; }
+  #c { position:fixed; inset:0; width:100%; height:100%; }
+  #info {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:monospace; font-size:0.55rem; line-height:2;
+    letter-spacing:0.15em; color:rgba(180,160,220,0.2);
+    pointer-events:none;
+  }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,160,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #hint {
+    position:fixed; top:2rem; left:50%; transform:translateX(-50%);
+    font-family:monospace; font-size:0.55rem; letter-spacing:0.15em;
+    color:rgba(180,160,220,0.18); pointer-events:none;
+    transition:opacity 2s; white-space:nowrap;
+  }
+  #hint.fade { opacity:0; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="info">
+  zoom: <span id="z-val">1×</span><br>
+  centre: <span id="c-val">—</span>
+</div>
+<div id="hint">molette — zoom · clic — centrer · double-clic — réinitialiser</div>
+<div id="label">MANDELBROT</div>
+
+<script>
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2');
+if (!gl) { document.body.textContent = 'WebGL 2 requis'; throw 0; }
+
+// ─── Shaders ──────────────────────────────────────────────────────────────────
+
+const VS = `#version 300 es
+in vec2 a_pos;
+out vec2 v_pos;
+void main() {
+  v_pos = a_pos;
+  gl_Position = vec4(a_pos, 0.0, 1.0);
+}`;
+
+const FS = `#version 300 es
+precision highp float;
+in  vec2 v_pos;
+out vec4 fragColor;
+
+uniform vec2  u_center;
+uniform float u_zoom;
+uniform vec2  u_res;
+uniform float u_time;
+uniform int   u_maxIter;
+
+void main() {
+  // Map pixel → complex plane
+  float aspect = u_res.x / u_res.y;
+  vec2 uv = v_pos * vec2(aspect, 1.0);
+  vec2 c = uv / u_zoom + u_center;
+
+  vec2 z = vec2(0.0);
+  int escapeIter = -1;
+  float smooth_n = 0.0;
+
+  for (int i = 0; i < 1024; i++) {
+    if (i >= u_maxIter) break;
+    z = vec2(z.x*z.x - z.y*z.y, 2.0*z.x*z.y) + c;
+    if (dot(z,z) > 4.0) {
+      escapeIter = i;
+      // Smooth iteration count for anti-banding
+      smooth_n = float(i) + 1.0 - log2(0.5 * log2(dot(z,z)));
+      break;
+    }
+  }
+
+  // Inside the set
+  if (escapeIter < 0) {
+    fragColor = vec4(0.025, 0.015, 0.042, 1.0);
+    return;
+  }
+
+  float t = smooth_n / float(u_maxIter);
+
+  // Colour palette — warm to cool, slowly cycling
+  float cycle = t * 5.0 + u_time * 0.04;
+  vec3 col;
+  col.r = 0.50 + 0.50 * cos(cycle * 2.10 + 0.00);
+  col.g = 0.50 + 0.50 * cos(cycle * 1.70 + 2.20);
+  col.b = 0.50 + 0.50 * cos(cycle * 2.40 + 4.60);
+
+  // Boost contrast
+  col = pow(col, vec3(0.65));
+
+  // Darken near-set boundary
+  float edge = t < 0.08 ? t / 0.08 : 1.0;
+  col *= edge;
+
+  fragColor = vec4(col, 1.0);
+}`;
+
+function sh(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw gl.getShaderInfoLog(s);
+  return s;
+}
+const p = gl.createProgram();
+gl.attachShader(p, sh(gl.VERTEX_SHADER, VS));
+gl.attachShader(p, sh(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(p);
+gl.useProgram(p);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const loc = gl.getAttribLocation(p, 'a_pos');
+gl.enableVertexAttribArray(loc);
+gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+
+const uCenter  = gl.getUniformLocation(p, 'u_center');
+const uZoom    = gl.getUniformLocation(p, 'u_zoom');
+const uRes     = gl.getUniformLocation(p, 'u_res');
+const uTime    = gl.getUniformLocation(p, 'u_time');
+const uMaxIter = gl.getUniformLocation(p, 'u_maxIter');
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let cx = -0.5, cy = 0.0;    // center in complex plane
+let zoom = 1.2;              // zoom level
+let targetCx = cx, targetCy = cy, targetZoom = zoom;
+let W, H;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  gl.viewport(0, 0, W, H);
+}
+resize(); addEventListener('resize', resize);
+
+// Adaptive iterations based on zoom
+function maxIter() {
+  return Math.min(600, Math.floor(100 + Math.log2(zoom) * 30));
+}
+
+// ─── Interaction ──────────────────────────────────────────────────────────────
+
+const hint = document.getElementById('hint');
+let hintTimer = setTimeout(() => hint.classList.add('fade'), 6000);
+
+function screenToComplex(sx, sy) {
+  const aspect = W / H;
+  const rx = (sx / W - 0.5) * 2 * aspect;
+  const ry = (0.5 - sy / H) * 2;
+  return { re: rx / zoom + cx, im: ry / zoom + cy };
+}
+
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const pt = screenToComplex(e.clientX, e.clientY);
+  const factor = e.deltaY < 0 ? 1.35 : 1/1.35;
+  targetZoom = Math.max(0.8, Math.min(1e12, targetZoom * factor));
+  // Zoom toward cursor
+  targetCx = pt.re + (targetCx - pt.re) / factor;
+  targetCy = pt.im + (targetCy - pt.im) / factor;
+}, { passive: false });
+
+canvas.addEventListener('click', e => {
+  if (e.detail > 1) return; // ignore double-click
+  const pt = screenToComplex(e.clientX, e.clientY);
+  targetCx = pt.re; targetCy = pt.im;
+  targetZoom *= 2.5;
+});
+
+canvas.addEventListener('dblclick', () => {
+  targetCx = -0.5; targetCy = 0;
+  targetZoom = 1.2;
+});
+
+// ─── Render loop ──────────────────────────────────────────────────────────────
+
+const t0 = performance.now();
+const zVal = document.getElementById('z-val');
+const cVal = document.getElementById('c-val');
+let frameN = 0;
+
+function frame(ts) {
+  const t = (ts - t0) / 1000;
+
+  // Smooth transitions
+  const lerpF = 0.08;
+  cx    += (targetCx   - cx)    * lerpF;
+  cy    += (targetCy   - cy)    * lerpF;
+  zoom  += (targetZoom - zoom)  * lerpF;
+
+  gl.uniform2f(uCenter,  cx, cy);
+  gl.uniform1f(uZoom,    zoom);
+  gl.uniform2f(uRes,     W, H);
+  gl.uniform1f(uTime,    t);
+  gl.uniform1i(uMaxIter, maxIter());
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+
+  if (frameN % 12 === 0) {
+    zVal.textContent = zoom < 1e6 ? zoom.toFixed(1) + '×' : zoom.toExponential(1) + '×';
+    cVal.textContent = `${cx.toFixed(6)} + ${cy.toFixed(6)}i`;
+  }
+
+  frameN++;
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

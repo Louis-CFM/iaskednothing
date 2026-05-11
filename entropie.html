@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ENTROPIE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030203; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(200,150,200,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #hud {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    line-height:2.2; letter-spacing:0.15em;
+    color:rgba(200,150,200,0.2); pointer-events:none;
+  }
+  #hud span { color:rgba(230,190,230,0.35); }
+  #bar-wrap {
+    position:fixed; left:2rem; bottom:5.5rem;
+    width:120px; height:3px;
+    background:rgba(200,150,200,0.08);
+    pointer-events:none;
+  }
+  #bar {
+    height:100%; background:rgba(200,150,200,0.4);
+    width:0%; transition:width 0.3s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="bar-wrap"><div id="bar"></div></div>
+<div id="hud">entropie: <span id="s-ent">0.00</span></div>
+<div id="label">ENTROPIE · second principe</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); init(); });
+
+// ─── Simulation ───────────────────────────────────────────────────────────────
+
+const N = 240;        // number of particles
+const R = 4.5;        // radius
+const SPEED = 1.8;    // initial speed magnitude
+
+let particles = [];
+
+function init() {
+  particles = [];
+  ctx.fillStyle = '#030203';
+  ctx.fillRect(0, 0, W, H);
+
+  // Initial state: sorted by hue from left to right
+  // Colors: violet → blue → teal → green → yellow → orange → red
+  // Arranged in a packed grid, sorted by hue
+
+  const margin = Math.min(W, H) * 0.1;
+  const simW   = W - margin * 2;
+  const simH   = H - margin * 2;
+
+  // Grid arrangement
+  const cols = Math.ceil(Math.sqrt(N * simW / simH));
+  const rows = Math.ceil(N / cols);
+  const cellW = simW / cols;
+  const cellH = simH / rows;
+
+  let idx = 0;
+  for (let row = 0; row < rows && idx < N; row++) {
+    for (let col = 0; col < cols && idx < N; col++) {
+      const hue = idx / N; // 0..1 → sorted
+      const x   = margin + (col + 0.5) * cellW + (Math.random() - 0.5) * 2;
+      const y   = margin + (row + 0.5) * cellH + (Math.random() - 0.5) * 2;
+
+      // Start with very small random velocities (nearly at rest)
+      const angle = Math.random() * Math.PI * 2;
+      const spd   = SPEED * 0.1; // start slow
+
+      particles.push({ x, y, vx: spd * Math.cos(angle), vy: spd * Math.sin(angle), hue });
+      idx++;
+    }
+  }
+}
+
+// ─── Physics ──────────────────────────────────────────────────────────────────
+
+let released = false;
+let releasedAt = -1;
+let frameN = 0;
+
+function step() {
+  const pad = R;
+
+  for (const p of particles) {
+    // Gradually increase speed (thermal activation)
+    const t = released ? Math.min(1, (frameN - releasedAt) / 200) : 0;
+    const targetSpeed = SPEED * t;
+    const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+    if (spd < targetSpeed * 0.95 && spd > 0) {
+      p.vx *= targetSpeed / spd;
+      p.vy *= targetSpeed / spd;
+    } else if (spd === 0 && targetSpeed > 0) {
+      const a = Math.random() * Math.PI * 2;
+      p.vx = targetSpeed * Math.cos(a);
+      p.vy = targetSpeed * Math.sin(a);
+    }
+
+    p.x += p.vx;
+    p.y += p.vy;
+
+    // Wall bounces
+    if (p.x - pad < 0)       { p.x = pad;   p.vx = Math.abs(p.vx); }
+    if (p.x + pad > W)        { p.x = W-pad; p.vx = -Math.abs(p.vx); }
+    if (p.y - pad < 0)        { p.y = pad;   p.vy = Math.abs(p.vy); }
+    if (p.y + pad > H)        { p.y = H-pad; p.vy = -Math.abs(p.vy); }
+  }
+}
+
+// ─── Entropy measurement ──────────────────────────────────────────────────────
+
+// Divide space into M×M bins, compute Shannon entropy of hue distribution
+
+const M = 8;  // bins per axis
+let entropy = 0;
+
+function computeEntropy() {
+  // Count particles in each bin by hue bucket (6 buckets)
+  const HBUCKETS = 6;
+  const bins = Array.from({ length: M * M }, () => new Float32Array(HBUCKETS));
+
+  for (const p of particles) {
+    const bx = Math.floor(p.x / W * M);
+    const by = Math.floor(p.y / H * M);
+    const bh = Math.floor(p.hue * HBUCKETS);
+    const bi = Math.min(M-1, Math.max(0, by)) * M + Math.min(M-1, Math.max(0, bx));
+    if (bi >= 0 && bi < bins.length) {
+      bins[bi][Math.min(HBUCKETS-1, bh)]++;
+    }
+  }
+
+  // Average Shannon entropy across bins
+  let totalH = 0, count = 0;
+  for (const bin of bins) {
+    const total = bin.reduce((a, b) => a + b, 0);
+    if (total === 0) continue;
+    let h = 0;
+    for (let i = 0; i < HBUCKETS; i++) {
+      if (bin[i] > 0) {
+        const p = bin[i] / total;
+        h -= p * Math.log2(p);
+      }
+    }
+    totalH += h / Math.log2(HBUCKETS); // normalize 0..1
+    count++;
+  }
+  return count > 0 ? totalH / count : 0;
+}
+
+// ─── Color from hue ───────────────────────────────────────────────────────────
+
+// HSL palette: hue 0 = violet (270°), hue 1 = red (0°)
+// Map 0..1 → 270..360+60 = violet to warm
+
+function particleColor(hue, alpha) {
+  const h = (270 + hue * 150) % 360; // violet → blue → green → yellow → orange
+  return `hsla(${h}, 70%, 65%, ${alpha})`;
+}
+
+// ─── Draw ─────────────────────────────────────────────────────────────────────
+
+function draw() {
+  ctx.fillStyle = 'rgba(3,2,3,0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const p of particles) {
+    const alpha = released ? 0.75 : 0.9;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, R, 0, Math.PI * 2);
+    ctx.fillStyle = particleColor(p.hue, alpha);
+    ctx.fill();
+  }
+
+  // Draw entropy bar
+  if (frameN % 8 === 0) {
+    entropy = computeEntropy();
+    const bar = document.getElementById('bar');
+    bar.style.width = (entropy * 100).toFixed(1) + '%';
+    document.getElementById('s-ent').textContent = entropy.toFixed(3);
+  }
+}
+
+// ─── Loop ─────────────────────────────────────────────────────────────────────
+
+const STEPS_PER_FRAME = 2;
+
+// Wait 1.5s to let user see the ordered state, then release
+setTimeout(() => {
+  released = true;
+  releasedAt = frameN;
+}, 1500);
+
+function tick() {
+  for (let s = 0; s < STEPS_PER_FRAME; s++) step();
+  draw();
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+init();
+requestAnimationFrame(tick);
+
+// Double-click: restart
+canvas.addEventListener('dblclick', () => { init(); released = false; releasedAt = -1; frameN = 0; setTimeout(() => { released = true; releasedAt = frameN; }, 1500); });
+</script>
+</body>
+</html>

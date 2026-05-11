@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MONDE</title>
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #02020a; overflow: hidden; }
+  canvas { display: block; }
+  #label {
+    position: fixed; bottom: 2rem; right: 2rem;
+    font-family: monospace; font-size: 0.55rem;
+    letter-spacing: 0.3em; color: rgba(200,175,130,0.1);
+    text-transform: uppercase;
+  }
+  #err {
+    display: none; position: fixed; inset: 0;
+    align-items: center; justify-content: center;
+    font-family: monospace; color: rgba(200,180,150,0.5);
+    font-size: 0.8rem; letter-spacing: 0.1em;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label">MONDE</div>
+<div id="err">WebGL non disponible sur cet appareil.</div>
+
+<script>
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl', { antialias: false });
+if (!gl) {
+  document.getElementById('err').style.display = 'flex';
+  canvas.style.display = 'none';
+}
+
+// ─── Vertex shader ───────────────────────────────────────────────────────────
+const VS = `
+attribute vec2 a_pos;
+void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }`;
+
+// ─── Fragment shader — raymarcher ─────────────────────────────────────────────
+const FS = `
+precision highp float;
+uniform vec2  u_res;
+uniform float u_time;
+
+// ── Rotation matrix ──────────────────────────────────────────────────────────
+mat2 rot(float a) { return mat2(cos(a),-sin(a),sin(a),cos(a)); }
+
+// ── Signed distance functions ─────────────────────────────────────────────────
+float sdTorus(vec3 p, vec2 t) {
+  return length(vec2(length(p.xz)-t.x,p.y))-t.y;
+}
+float sdSphere(vec3 p, float r) { return length(p)-r; }
+
+float smin(float a, float b, float k) {
+  float h = max(k-abs(a-b),0.0)/k;
+  return min(a,b)-h*h*k*0.25;
+}
+
+// ── Scene (returns vec2: dist, materialID) ────────────────────────────────────
+vec2 map(vec3 p) {
+  float T = u_time * 0.22;
+
+  // — Main torus (tilted, rotating)
+  vec3 q = p;
+  q.yz = rot(0.55) * q.yz;
+  q.xz = rot(T * 0.65) * q.xz;
+  float torus = sdTorus(q, vec2(1.05, 0.25));
+
+  // — Inner sphere, slightly offset
+  vec3 sp = p;
+  sp.xz = rot(-T * 0.4) * sp.xz;
+  sp.xy = rot(T * 0.2) * sp.xy;
+  float inner = sdSphere(sp - vec3(0.0,0.0,0.0), 0.35);
+
+  // — Orbiting companion
+  float oA = T * 1.4;
+  vec3 orb = p - vec3(cos(oA)*1.75, sin(T*0.7)*0.4, sin(oA)*1.75);
+  float companion = sdSphere(orb, 0.14);
+
+  // — Ring of small satellites
+  float sats = 1e9;
+  for (int i = 0; i < 5; i++) {
+    float fi = float(i);
+    float a = T*0.6 + fi*1.2566; // 2π/5
+    vec3 sp2 = p;
+    sp2.xz = rot(fi*0.4) * sp2.xz;
+    sp2.yz = rot(fi*0.3 + 0.5) * sp2.yz;
+    sp2 -= vec3(cos(a)*0.72, sin(a)*0.15, sin(a)*0.72);
+    sats = min(sats, sdSphere(sp2, 0.055 + sin(T*1.1+fi)*0.015));
+  }
+
+  float d = smin(torus, inner, 0.35);
+  float mat = 1.0;
+  if (d > companion) { d = companion; mat = 2.0; }
+  if (d > sats)       { d = sats;      mat = 3.0; }
+  return vec2(d, mat);
+}
+
+// ── Normal via central differences ────────────────────────────────────────────
+vec3 normal(vec3 p) {
+  vec2 e = vec2(0.001, 0.0);
+  return normalize(vec3(
+    map(p+e.xyy).x - map(p-e.xyy).x,
+    map(p+e.yxy).x - map(p-e.yxy).x,
+    map(p+e.yyx).x - map(p-e.yyx).x
+  ));
+}
+
+// ── Ambient occlusion ─────────────────────────────────────────────────────────
+float ao(vec3 p, vec3 n) {
+  float occ = 0.0, s = 1.0;
+  for (int i = 1; i <= 6; i++) {
+    float h = 0.01 + 0.14 * float(i) / 6.0;
+    occ += (h - map(p + n*h).x) * s;
+    s *= 0.9;
+  }
+  return clamp(1.0 - 2.8*occ, 0.0, 1.0);
+}
+
+// ── Soft shadow ───────────────────────────────────────────────────────────────
+float shadow(vec3 ro, vec3 rd, float tmin, float tmax) {
+  float res = 1.0;
+  float t = tmin;
+  for (int i = 0; i < 24; i++) {
+    float h = map(ro + rd*t).x;
+    res = min(res, 8.0*h/t);
+    t += clamp(h, 0.02, 0.2);
+    if (res < 0.001 || t > tmax) break;
+  }
+  return clamp(res, 0.0, 1.0);
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+void main() {
+  vec2 uv = (gl_FragCoord.xy - u_res*0.5) / u_res.y;
+
+  // Camera orbits slowly
+  float cT = u_time * 0.06;
+  float cR = 4.0;
+  vec3 ro = vec3(cos(cT)*cR, 1.3+sin(cT*0.35)*0.6, sin(cT)*cR);
+  vec3 ta = vec3(0.0, 0.0, 0.0);
+  vec3 fw = normalize(ta - ro);
+  vec3 ri = normalize(cross(vec3(0,1,0), fw));
+  vec3 up = cross(fw, ri);
+  vec3 rd = normalize(fw*1.5 + ri*uv.x + up*uv.y);
+
+  // Raymarch
+  float t = 0.1;
+  float hitT = -1.0;
+  float matId = 0.0;
+  for (int i = 0; i < 90; i++) {
+    vec2 res = map(ro + rd*t);
+    if (res.x < 0.0006) { hitT = t; matId = res.y; break; }
+    t += res.x * 0.85;
+    if (t > 22.0) break;
+  }
+
+  // Background: deep dark space, slight purple gradient
+  vec3 col = mix(
+    vec3(0.018, 0.012, 0.030),
+    vec3(0.035, 0.025, 0.055),
+    clamp(uv.y * 0.5 + 0.5, 0.0, 1.0)
+  );
+  // Subtle star field
+  float starSeed = fract(sin(dot(uv * 1000.0, vec2(127.1, 311.7))) * 43758.5);
+  if (starSeed > 0.997) col += vec3(starSeed * 0.4);
+
+  if (hitT > 0.0) {
+    vec3 p  = ro + rd * hitT;
+    vec3 n  = normal(p);
+    vec3 l1 = normalize(vec3(2.0, 3.5, 1.5));
+    vec3 l2 = normalize(vec3(-1.5, -0.5, -1.0));
+
+    float diff1 = max(dot(n, l1), 0.0);
+    float diff2 = max(dot(n, l2), 0.0) * 0.2;
+    float sh    = shadow(p + n*0.002, l1, 0.01, 6.0);
+    float spec  = pow(max(dot(reflect(-l1,n), -rd), 0.0), 56.0);
+    float fres  = pow(1.0 - max(dot(-rd, n), 0.0), 4.0);
+    float occ   = ao(p, n);
+
+    // Material colours
+    vec3 base;
+    if      (matId < 1.5) base = vec3(0.72, 0.60, 0.40); // warm gold (torus+inner)
+    else if (matId < 2.5) base = vec3(0.55, 0.65, 0.80); // cool blue (companion)
+    else                  base = vec3(0.80, 0.75, 0.65); // pale ivory (satellites)
+
+    col  = base * (diff1*sh*0.80 + diff2 + 0.06);
+    col += vec3(1.0, 0.95, 0.85) * spec * sh * 0.55;
+    col += vec3(0.28, 0.38, 0.65) * fres * 0.22;
+    col *= occ;
+
+    // Fog / depth
+    col = mix(col, vec3(0.018, 0.012, 0.030), 1.0-exp(-hitT*0.06));
+  }
+
+  // Tone map (filmic-ish)
+  col = col * (2.51*col + 0.03) / (col*(2.43*col + 0.59) + 0.14);
+  col = pow(clamp(col,0.0,1.0), vec3(0.45));
+
+  // Vignette
+  float vign = dot(uv, uv);
+  col *= 1.0 - vign*0.42;
+
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+function compileShader(type, src) {
+  const sh = gl.createShader(type);
+  gl.shaderSource(sh, src);
+  gl.compileShader(sh);
+  if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) {
+    console.error('Shader error:', gl.getShaderInfoLog(sh));
+    return null;
+  }
+  return sh;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compileShader(gl.VERTEX_SHADER, VS));
+gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+  console.error('Link error:', gl.getProgramInfoLog(prog));
+}
+gl.useProgram(prog);
+
+// Fullscreen quad
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'a_pos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const uRes  = gl.getUniformLocation(prog, 'u_res');
+const uTime = gl.getUniformLocation(prog, 'u_time');
+
+let W, H;
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  gl.viewport(0, 0, W, H);
+}
+resize();
+window.addEventListener('resize', resize);
+
+const t0 = performance.now();
+function frame() {
+  const t = (performance.now() - t0) / 1000;
+  gl.uniform2f(uRes, W, H);
+  gl.uniform1f(uTime, t);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

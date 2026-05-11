@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOURIER</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020210; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,160,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #name {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.2em; color:rgba(180,160,220,0.2);
+    pointer-events:none; transition:opacity 0.8s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="name"></div>
+<div id="label">FOURIER · épicycles</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); restart(); });
+
+// ─── Shape library ────────────────────────────────────────────────────────────
+
+const N = 256; // sample count (must be ≥ epicycle count)
+
+const SHAPES = [
+  {
+    name: 'cœur',
+    sample(i) {
+      const t = (i / N) * Math.PI * 2;
+      return {
+        x:  16 * Math.sin(t) ** 3,
+        y: -(13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t)),
+      };
+    },
+    scale: 12,
+  },
+  {
+    name: 'papillon',
+    sample(i) {
+      // Butterfly curve (Fey)
+      const t = (i / N) * Math.PI * 24;
+      const r = Math.exp(Math.sin(t)) - 2 * Math.cos(4 * t) + Math.pow(Math.sin((2*t - Math.PI) / 24), 5);
+      return { x: r * Math.sin(t), y: -r * Math.cos(t) };
+    },
+    scale: 50,
+  },
+  {
+    name: 'trefle',
+    sample(i) {
+      const t = (i / N) * Math.PI * 2;
+      const r = Math.cos(3 * t);
+      return { x: r * Math.cos(t), y: -r * Math.sin(t) };
+    },
+    scale: 160,
+  },
+  {
+    name: 'hypocycloïde',
+    sample(i) {
+      const t = (i / N) * Math.PI * 2;
+      const a = 3, b = 1;
+      return {
+        x: (a - b) * Math.cos(t) + b * Math.cos((a-b)/b * t),
+        y: -((a - b) * Math.sin(t) - b * Math.sin((a-b)/b * t)),
+      };
+    },
+    scale: 70,
+  },
+  {
+    name: 'lemniscate',
+    sample(i) {
+      const t = (i / N) * Math.PI * 2;
+      const denom = 1 + Math.sin(t) ** 2;
+      return {
+        x: Math.cos(t) / denom,
+        y: -Math.sin(t) * Math.cos(t) / denom,
+      };
+    },
+    scale: 220,
+  },
+  {
+    name: 'étoile',
+    sample(i) {
+      const t = (i / N) * Math.PI * 2;
+      const r = 1 + 0.4 * Math.cos(6 * t);
+      return { x: r * Math.cos(t), y: -r * Math.sin(t) };
+    },
+    scale: 140,
+  },
+];
+
+// ─── DFT (naive O(N²)) ────────────────────────────────────────────────────────
+
+function dft(pts) {
+  const n = pts.length;
+  const result = [];
+  for (let k = 0; k < n; k++) {
+    let re = 0, im = 0;
+    for (let j = 0; j < n; j++) {
+      const angle = (2 * Math.PI * k * j) / n;
+      re += pts[j].x * Math.cos(angle) + pts[j].y * Math.sin(angle);
+      im -= pts[j].x * Math.sin(angle) - pts[j].y * Math.cos(angle);
+    }
+    re /= n; im /= n;
+    const amp   = Math.sqrt(re * re + im * im);
+    const phase = Math.atan2(im, re);
+    // Map k to signed frequency: 0..N/2 → 0..N/2, N/2+1..N-1 → -(N/2-1)..-1
+    const freq = k <= n / 2 ? k : k - n;
+    result.push({ freq, amp, phase });
+  }
+  // Sort by amplitude descending
+  result.sort((a, b) => b.amp - a.amp);
+  return result;
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let epicycles = [];
+let shapeIdx  = 0;
+let path      = [];     // accumulated tip positions
+let timeStep  = 0;      // 0..1 (fraction of full period)
+let shapeScale = 1;
+let phaseSwitching = false;
+
+function loadShape(idx) {
+  const shape = SHAPES[idx];
+  const pts = Array.from({ length: N }, (_, i) => shape.sample(i));
+  epicycles  = dft(pts).slice(0, 100); // top 100 components
+  shapeScale = shape.scale;
+  timeStep   = 0;
+  path       = [];
+  phaseSwitching = false;
+  document.getElementById('name').style.opacity = '1';
+  document.getElementById('name').textContent = shape.name;
+}
+
+function nextShape() {
+  phaseSwitching = true;
+  document.getElementById('name').style.opacity = '0';
+  setTimeout(() => {
+    shapeIdx = (shapeIdx + 1) % SHAPES.length;
+    loadShape(shapeIdx);
+  }, 800);
+}
+
+function restart() { loadShape(shapeIdx); }
+
+loadShape(0);
+
+// ─── Draw ─────────────────────────────────────────────────────────────────────
+
+const STEPS_PER_FRAME = 2; // advance time by 2/N per frame
+const DT = 1 / N;
+
+function drawEpicycles(cx0, cy0, time) {
+  let x = cx0, y = cy0;
+
+  for (const e of epicycles) {
+    const ox = x, oy = y;
+    const angle = e.freq * time * Math.PI * 2 + e.phase;
+    const r = e.amp * shapeScale;
+
+    // Skip tiny circles
+    if (r < 0.3) continue;
+
+    // Circle outline
+    ctx.beginPath();
+    ctx.arc(ox, oy, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(120, 100, 180, ${Math.min(0.15, r * 0.004)})`;
+    ctx.lineWidth = 0.5;
+    ctx.stroke();
+
+    x += r * Math.cos(angle);
+    y += r * Math.sin(angle);
+
+    // Arm
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(x, y);
+    ctx.strokeStyle = `rgba(160, 140, 220, ${Math.min(0.4, r * 0.01)})`;
+    ctx.lineWidth = 0.7;
+    ctx.stroke();
+  }
+
+  return { x, y };
+}
+
+let frame = 0;
+
+function tick() {
+  frame++;
+
+  // Slow fade background
+  ctx.fillStyle = 'rgba(2, 2, 16, 0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  if (phaseSwitching) {
+    requestAnimationFrame(tick);
+    return;
+  }
+
+  const cx = W / 2, cy = H / 2;
+
+  // Advance time
+  for (let s = 0; s < STEPS_PER_FRAME; s++) {
+    const { x, y } = drawEpicycles(cx, cy, timeStep);
+    path.push({ x, y });
+    timeStep += DT;
+  }
+
+  // Draw traced path
+  if (path.length > 1) {
+    ctx.beginPath();
+    ctx.moveTo(path[0].x, path[0].y);
+    for (let i = 1; i < path.length; i++) {
+      ctx.lineTo(path[i].x, path[i].y);
+    }
+    const progress = timeStep; // 0..1
+    ctx.strokeStyle = `rgba(220, 200, 255, 0.7)`;
+    ctx.lineWidth = 1.4;
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+  }
+
+  // Draw current epicycles (on top of faded background)
+  drawEpicycles(cx, cy, timeStep);
+
+  // Tip dot
+  const { x: tx, y: ty } = drawEpicycles(cx, cy, timeStep);
+  ctx.beginPath();
+  ctx.arc(tx, ty, 2.5, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(240, 220, 255, 0.9)';
+  ctx.fill();
+
+  // Period complete?
+  if (timeStep >= 1) {
+    setTimeout(nextShape, 3500);
+    timeStep = 999; // halt advancement
+  }
+
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+// Click: skip to next shape
+canvas.addEventListener('click', () => {
+  if (timeStep < 0.5) return;
+  nextShape();
+});
+</script>
+</body>
+</html>

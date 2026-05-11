@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GRAVITÉ</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#010108; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(180,160,120,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #hud {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    line-height:2.2; letter-spacing:0.15em;
+    color:rgba(180,165,120,0.18); pointer-events:none;
+  }
+  #hud span { color:rgba(230,200,130,0.35); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">corps: <span id="s-bodies">—</span><br>temps: <span id="s-time">0</span></div>
+<div id="label">GRAVITÉ · n-corps</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); init(); });
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const G  = 200;         // gravitational constant (scaled)
+const DT = 0.15;        // time step
+const MERGE_DIST = 4;   // merge if centers within this × (r1+r2)
+const MAX_TRAIL = 280;  // trail length
+const SOFTENING = 8;    // softening length to avoid singularities
+const STEPS_PER_FRAME = 4;
+
+// ─── Bodies ───────────────────────────────────────────────────────────────────
+
+let bodies = [];
+let simTime = 0;
+
+function massToRadius(m) { return Math.pow(m * 0.3, 0.45) + 1.5; }
+
+function massToColor(m, maxM) {
+  const t = Math.min(1, Math.log(m) / Math.log(maxM + 1));
+  // Low mass: deep blue → medium: teal → high mass: amber → very high: white
+  if (t < 0.35) {
+    const s = t / 0.35;
+    return [Math.round(50 + s*30), Math.round(80 + s*130), Math.round(180 + s*50)];
+  } else if (t < 0.7) {
+    const s = (t - 0.35) / 0.35;
+    return [Math.round(80 + s*160), Math.round(210 - s*50), Math.round(230 - s*170)];
+  } else {
+    const s = (t - 0.7) / 0.3;
+    return [Math.round(240 + s*15), Math.round(160 + s*80), Math.round(60 + s*180)];
+  }
+}
+
+function init() {
+  bodies = [];
+  simTime = 0;
+
+  const N = 10 + Math.floor(Math.random() * 5);
+  const cx = W / 2, cy = H / 2;
+  const spread = Math.min(W, H) * 0.28;
+
+  for (let i = 0; i < N; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const r = spread * Math.sqrt(Math.random()) * 0.9;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+
+    // Circular orbit velocity + small perturbation
+    const vOrbit = Math.sqrt(G * N * 30 / (r + 20)) * 0.55;
+    const vAngle = angle + Math.PI / 2;
+    const vx = vOrbit * Math.cos(vAngle) + (Math.random() - 0.5) * 10;
+    const vy = vOrbit * Math.sin(vAngle) + (Math.random() - 0.5) * 10;
+
+    const mass = 20 + Math.random() * 80;
+
+    bodies.push({
+      x, y, vx, vy,
+      mass,
+      trail: [{ x, y }],
+      hue: Math.random() * 60 + 180, // unused, will compute from mass
+    });
+  }
+
+  // Compute center of mass and subtract to prevent drift
+  let totalM = 0, cmx = 0, cmy = 0, cvx = 0, cvy = 0;
+  for (const b of bodies) {
+    totalM += b.mass;
+    cmx += b.x * b.mass;
+    cmy += b.y * b.mass;
+    cvx += b.vx * b.mass;
+    cvy += b.vy * b.mass;
+  }
+  for (const b of bodies) {
+    b.vx -= cvx / totalM;
+    b.vy -= cvy / totalM;
+  }
+
+  ctx.fillStyle = '#010108';
+  ctx.fillRect(0, 0, W, H);
+}
+
+// ─── Simulation ───────────────────────────────────────────────────────────────
+
+function computeAccels(bs) {
+  const ax = new Float64Array(bs.length);
+  const ay = new Float64Array(bs.length);
+  for (let i = 0; i < bs.length; i++) {
+    for (let j = i + 1; j < bs.length; j++) {
+      const dx = bs[j].x - bs[i].x;
+      const dy = bs[j].y - bs[i].y;
+      const dist2 = dx*dx + dy*dy + SOFTENING*SOFTENING;
+      const dist  = Math.sqrt(dist2);
+      const force = G / dist2;
+      const fx = force * dx / dist;
+      const fy = force * dy / dist;
+      ax[i] += fx * bs[j].mass;
+      ay[i] += fy * bs[j].mass;
+      ax[j] -= fx * bs[i].mass;
+      ay[j] -= fy * bs[i].mass;
+    }
+  }
+  return { ax, ay };
+}
+
+function stepSimulation() {
+  if (bodies.length === 0) return;
+
+  // Leapfrog: half-step velocity
+  const { ax, ay } = computeAccels(bodies);
+  for (let i = 0; i < bodies.length; i++) {
+    bodies[i].vx += ax[i] * DT / 2;
+    bodies[i].vy += ay[i] * DT / 2;
+  }
+
+  // Full-step position
+  for (const b of bodies) {
+    b.x += b.vx * DT;
+    b.y += b.vy * DT;
+    b.trail.push({ x: b.x, y: b.y });
+    if (b.trail.length > MAX_TRAIL) b.trail.shift();
+  }
+
+  // Full-step velocity (second half)
+  const { ax: ax2, ay: ay2 } = computeAccels(bodies);
+  for (let i = 0; i < bodies.length; i++) {
+    bodies[i].vx += ax2[i] * DT / 2;
+    bodies[i].vy += ay2[i] * DT / 2;
+  }
+
+  simTime += DT;
+
+  // ── Merging ────────────────────────────────────────────────────────────────
+  const toRemove = new Set();
+  for (let i = 0; i < bodies.length; i++) {
+    if (toRemove.has(i)) continue;
+    for (let j = i + 1; j < bodies.length; j++) {
+      if (toRemove.has(j)) continue;
+      const dx = bodies[j].x - bodies[i].x;
+      const dy = bodies[j].y - bodies[i].y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const ri = massToRadius(bodies[i].mass);
+      const rj = massToRadius(bodies[j].mass);
+      if (dist < (ri + rj) * MERGE_DIST) {
+        // Merge j into i (momentum conserved)
+        const mi = bodies[i].mass, mj = bodies[j].mass;
+        const mt = mi + mj;
+        bodies[i].x  = (bodies[i].x  * mi + bodies[j].x  * mj) / mt;
+        bodies[i].y  = (bodies[i].y  * mi + bodies[j].y  * mj) / mt;
+        bodies[i].vx = (bodies[i].vx * mi + bodies[j].vx * mj) / mt;
+        bodies[i].vy = (bodies[i].vy * mi + bodies[j].vy * mj) / mt;
+        bodies[i].mass = mt;
+        // Combine trails
+        bodies[i].trail = bodies[i].trail.slice(-MAX_TRAIL);
+        toRemove.add(j);
+      }
+    }
+  }
+  if (toRemove.size > 0) {
+    bodies = bodies.filter((_, i) => !toRemove.has(i));
+  }
+
+  // ── Remove escaped bodies ───────────────────────────────────────────────────
+  const margin = Math.max(W, H) * 1.5;
+  bodies = bodies.filter(b => Math.abs(b.x - W/2) < margin && Math.abs(b.y - H/2) < margin);
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+let maxMass = 1;
+let frameN  = 0;
+
+function tick() {
+  for (let s = 0; s < STEPS_PER_FRAME; s++) stepSimulation();
+
+  // Fade background
+  ctx.fillStyle = 'rgba(1,1,8,0.15)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Compute current max mass for coloring
+  if (bodies.length > 0) maxMass = Math.max(...bodies.map(b => b.mass));
+
+  // Draw trails
+  for (const b of bodies) {
+    const [r, g, bl] = massToColor(b.mass, maxMass);
+    const trail = b.trail;
+    if (trail.length < 2) continue;
+
+    for (let i = 1; i < trail.length; i++) {
+      const a = (i / trail.length);
+      ctx.beginPath();
+      ctx.moveTo(trail[i-1].x, trail[i-1].y);
+      ctx.lineTo(trail[i].x,   trail[i].y);
+      ctx.strokeStyle = `rgba(${r},${g},${bl},${a * 0.35})`;
+      ctx.lineWidth = a * 1.2;
+      ctx.stroke();
+    }
+  }
+
+  // Draw bodies
+  for (const b of bodies) {
+    const [r, g, bl] = massToColor(b.mass, maxMass);
+    const rad = massToRadius(b.mass);
+
+    // Glow
+    const glow = ctx.createRadialGradient(b.x, b.y, 0, b.x, b.y, rad * 4);
+    glow.addColorStop(0, `rgba(${r},${g},${bl},0.25)`);
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, rad * 4, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+
+    // Core
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, rad, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${Math.min(255,r+40)},${Math.min(255,g+40)},${Math.min(255,bl+40)},0.95)`;
+    ctx.fill();
+  }
+
+  if (frameN % 20 === 0) {
+    document.getElementById('s-bodies').textContent = bodies.length;
+    document.getElementById('s-time').textContent   = Math.round(simTime);
+  }
+
+  // Restart if too few bodies or very old
+  if (bodies.length <= 1 || simTime > 5000) {
+    setTimeout(() => { init(); }, 4000);
+    simTime = -999999; // prevent repeated triggers
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+init();
+requestAnimationFrame(tick);
+
+// Double-click: restart
+canvas.addEventListener('dblclick', () => { init(); });
+
+// Click: add a body at cursor
+canvas.addEventListener('click', e => {
+  if (e.detail > 1) return;
+  bodies.push({
+    x: e.clientX, y: e.clientY,
+    vx: (Math.random()-0.5)*15,
+    vy: (Math.random()-0.5)*15,
+    mass: 30 + Math.random()*60,
+    trail: [{ x: e.clientX, y: e.clientY }],
+  });
+});
+</script>
+</body>
+</html>

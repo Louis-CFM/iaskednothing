@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DÉRIVE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital@0;1&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #040406;
+    overflow: hidden;
+    font-family: 'DM Mono', monospace;
+    color: #ccc;
+  }
+
+  canvas { position: fixed; inset: 0; display: block; }
+
+  #start {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    cursor: pointer;
+    z-index: 10;
+    transition: opacity 1.5s ease;
+  }
+
+  #start.hidden { opacity: 0; pointer-events: none; }
+
+  #dot {
+    width: 8px; height: 8px;
+    background: rgba(140, 120, 200, 0.7);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  #start p {
+    font-size: 0.65rem;
+    letter-spacing: 0.25em;
+    color: rgba(180, 170, 210, 0.4);
+    text-transform: uppercase;
+  }
+
+  @keyframes pulse {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.6); opacity: 1; }
+  }
+
+  #label {
+    position: fixed;
+    top: 2.5rem;
+    left: 2.5rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.3em;
+    color: rgba(140, 120, 200, 0.2);
+    text-transform: uppercase;
+    z-index: 5;
+  }
+
+  #timer {
+    position: fixed;
+    bottom: 2.5rem;
+    right: 2.5rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    color: rgba(140, 120, 200, 0.15);
+    z-index: 5;
+  }
+
+  #note-display {
+    position: fixed;
+    bottom: 2.5rem;
+    left: 2.5rem;
+    font-size: 0.6rem;
+    letter-spacing: 0.2em;
+    color: rgba(140, 120, 200, 0.12);
+    z-index: 5;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="start">
+  <div id="dot"></div>
+  <p>toucher pour écouter</p>
+</div>
+
+<div id="label">DÉRIVE</div>
+<div id="timer">0:00</div>
+<div id="note-display">—</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const startEl = document.getElementById('start');
+const timerEl = document.getElementById('timer');
+const noteEl = document.getElementById('note-display');
+
+let W, H, audioCtx, analyser, started = false, startTime;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// A minor pentatonic across 3 octaves
+const NOTES = {
+  'A2': 110.00, 'C3': 130.81, 'D3': 146.83, 'E3': 164.81, 'G3': 196.00,
+  'A3': 220.00, 'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'G4': 392.00,
+  'A4': 440.00, 'C5': 523.25, 'D5': 587.33,
+};
+const NOTE_NAMES = Object.keys(NOTES);
+const NOTE_FREQS = Object.values(NOTES);
+
+function createReverb(ctx, duration = 3.5, decay = 2.5) {
+  const convolver = ctx.createConvolver();
+  const rate = ctx.sampleRate;
+  const length = Math.floor(rate * duration);
+  const impulse = ctx.createBuffer(2, length, rate);
+  for (let c = 0; c < 2; c++) {
+    const ch = impulse.getChannelData(c);
+    for (let i = 0; i < length; i++) {
+      ch[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+    }
+  }
+  convolver.buffer = impulse;
+  return convolver;
+}
+
+function createDrone(ctx, masterGain, reverb) {
+  const freq = NOTE_FREQS[0]; // A2 = 110Hz
+  const osc1 = ctx.createOscillator();
+  const osc2 = ctx.createOscillator();
+  const gain = ctx.createGain();
+  const lfo = ctx.createOscillator();
+  const lfoGain = ctx.createGain();
+
+  osc1.type = 'sine';
+  osc1.frequency.value = freq;
+  osc2.type = 'sine';
+  osc2.frequency.value = freq * 2; // octave
+
+  lfo.type = 'sine';
+  lfo.frequency.value = 0.04; // very slow breath
+  lfoGain.gain.value = 0.02;
+
+  gain.gain.value = 0.06;
+
+  lfo.connect(lfoGain);
+  lfoGain.connect(gain.gain);
+  osc1.connect(gain);
+  osc2.connect(gain);
+  gain.connect(reverb);
+  gain.connect(masterGain);
+
+  lfo.start();
+  osc1.start();
+  osc2.start();
+}
+
+function createPad(ctx, masterGain, reverb) {
+  // Cluster of detuned oscillators on A2 chord tones
+  const chordFreqs = [110, 164.81, 220, 329.63]; // A2, E3, A3, E4
+  const gain = ctx.createGain();
+  gain.gain.value = 0.03;
+
+  chordFreqs.forEach((f, i) => {
+    for (let j = 0; j < 3; j++) {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = f * (1 + (Math.random() - 0.5) * 0.004); // subtle detune
+      osc.start();
+      osc.connect(gain);
+    }
+  });
+
+  gain.connect(reverb);
+}
+
+class MelodyVoice {
+  constructor(ctx, masterGain, reverb) {
+    this.ctx = ctx;
+    this.masterGain = masterGain;
+    this.reverb = reverb;
+    this.osc = null;
+    this.gain = ctx.createGain();
+    this.gain.gain.value = 0;
+    this.gain.connect(reverb);
+    this.gain.connect(masterGain);
+    this.currentNoteIdx = 7; // start at A3
+    this.nextChangeTime = 0;
+    this.scheduleNext(ctx.currentTime);
+  }
+
+  scheduleNext(time) {
+    // Pick next note — prefer small steps
+    const step = Math.random() < 0.6
+      ? (Math.random() < 0.5 ? 1 : -1)
+      : (Math.random() < 0.5 ? 2 : -2);
+    this.currentNoteIdx = Math.max(0, Math.min(NOTE_FREQS.length - 1, this.currentNoteIdx + step));
+    const freq = NOTE_FREQS[this.currentNoteIdx];
+    const noteName = NOTE_NAMES[this.currentNoteIdx];
+
+    // Stop old oscillator
+    if (this.osc) {
+      this.gain.gain.setTargetAtTime(0, time, 0.4);
+      const oldOsc = this.osc;
+      setTimeout(() => { try { oldOsc.stop(); } catch(e) {} }, (time - this.ctx.currentTime + 1.5) * 1000);
+    }
+
+    // Create new oscillator
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = freq;
+    osc.connect(this.gain);
+    osc.start(time);
+    this.osc = osc;
+
+    // Fade in
+    this.gain.gain.setTargetAtTime(0.07, time + 0.1, 0.6);
+
+    // Update note display
+    const delay = Math.max(0, (time - this.ctx.currentTime) * 1000);
+    setTimeout(() => { noteEl.textContent = noteName.toLowerCase(); }, delay);
+
+    const holdDuration = 4000 + Math.random() * 9000;
+    this.nextChangeTime = time + holdDuration / 1000;
+    setTimeout(() => this.scheduleNext(this.ctx.currentTime), holdDuration - 500);
+  }
+}
+
+function startAudio() {
+  if (started) return;
+  started = true;
+  startTime = Date.now();
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.88;
+
+  const master = audioCtx.createGain();
+  master.gain.value = 0;
+  master.gain.setTargetAtTime(0.7, audioCtx.currentTime, 2.5);
+  master.connect(analyser);
+  master.connect(audioCtx.destination);
+
+  const reverb = createReverb(audioCtx, 4, 2);
+  reverb.connect(master);
+
+  createDrone(audioCtx, master, reverb);
+  createPad(audioCtx, master, reverb);
+  new MelodyVoice(audioCtx, master, reverb);
+
+  startEl.classList.add('hidden');
+}
+
+document.addEventListener('click', startAudio);
+document.addEventListener('touchstart', startAudio, { passive: true });
+
+// Visualization
+const bufferLen = 2048;
+const dataArray = new Uint8Array(bufferLen);
+
+let hueShift = 0;
+
+function drawWave() {
+  if (!analyser) {
+    // Before start: draw quiet circle
+    ctx.fillStyle = 'rgba(4, 4, 6, 0.3)';
+    ctx.fillRect(0, 0, W, H);
+    requestAnimationFrame(drawWave);
+    return;
+  }
+
+  ctx.fillStyle = 'rgba(4, 4, 6, 0.25)';
+  ctx.fillRect(0, 0, W, H);
+
+  analyser.getByteTimeDomainData(dataArray);
+
+  hueShift += 0.015;
+
+  const cx = W / 2, cy = H / 2;
+  const baseR = Math.min(W, H) * 0.22;
+
+  ctx.save();
+  ctx.beginPath();
+
+  const slices = bufferLen / 2;
+  for (let i = 0; i < slices; i++) {
+    const t = i / slices;
+    const angle = t * Math.PI * 2 - Math.PI / 2;
+    const sample = (dataArray[i] / 128) - 1;
+    const r = baseR + sample * baseR * 0.5;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+
+  const hue = 250 + Math.sin(hueShift * 0.3) * 30;
+  ctx.strokeStyle = `hsla(${hue}, 60%, 65%, 0.35)`;
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  // Outer ghost ring
+  ctx.beginPath();
+  for (let i = 0; i < slices; i++) {
+    const t = i / slices;
+    const angle = t * Math.PI * 2 - Math.PI / 2;
+    const sample = (dataArray[i + slices > bufferLen - 1 ? bufferLen - 1 : i + slices] / 128) - 1;
+    const r = baseR * 1.25 + sample * baseR * 0.25;
+    const x = cx + r * Math.cos(angle);
+    const y = cy + r * Math.sin(angle);
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = `hsla(${hue + 20}, 50%, 55%, 0.12)`;
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // Center dot
+  const rms = Math.sqrt(Array.from(dataArray).reduce((s, v) => s + ((v/128)-1)**2, 0) / bufferLen);
+  const dotR = 2 + rms * 20;
+  ctx.beginPath();
+  ctx.arc(cx, cy, dotR, 0, Math.PI * 2);
+  ctx.fillStyle = `hsla(${hue}, 70%, 70%, 0.3)`;
+  ctx.fill();
+
+  ctx.restore();
+
+  // Timer
+  if (startTime) {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const m = Math.floor(elapsed / 60);
+    const s = elapsed % 60;
+    timerEl.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  }
+
+  requestAnimationFrame(drawWave);
+}
+
+requestAnimationFrame(drawWave);
+</script>
+</body>
+</html>

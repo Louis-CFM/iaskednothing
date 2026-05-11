@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRISTAL</title>
+<style>
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#010108; overflow:hidden; }
+  canvas {
+    position:fixed; display:block;
+    image-rendering:pixelated; image-rendering:crisp-edges;
+  }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(140,200,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #hud {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:monospace; font-size:0.55rem; line-height:2.2;
+    letter-spacing:0.15em; color:rgba(140,200,220,0.18);
+    pointer-events:none;
+  }
+  #hud span { color:rgba(200,230,180,0.35); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  particules: <span id="s-count">1</span><br>
+  rayon: <span id="s-radius">0</span>
+</div>
+<div id="label">CRISTAL · agrégation diffusion-limitée</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+const SIM = 480;
+canvas.width = SIM;
+canvas.height = SIM;
+
+function resize() {
+  const scale = Math.min(innerWidth / SIM, innerHeight / SIM);
+  canvas.style.width  = SIM * scale + 'px';
+  canvas.style.height = SIM * scale + 'px';
+  canvas.style.left   = (innerWidth  - SIM * scale) / 2 + 'px';
+  canvas.style.top    = (innerHeight - SIM * scale) / 2 + 'px';
+}
+resize(); addEventListener('resize', resize);
+
+const CX = SIM >> 1, CY = SIM >> 1;
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+const grid   = new Uint32Array(SIM * SIM); // 0=empty, >0=join order
+const imgBuf = ctx.createImageData(SIM, SIM);
+const pix    = imgBuf.data;
+
+// Alpha channel: all opaque
+for (let i = 3; i < pix.length; i += 4) pix[i] = 255;
+
+let clusterSize = 0;
+let maxDist = 0;
+
+// ─── Color ────────────────────────────────────────────────────────────────────
+
+// Palette spans from center outward:
+// young (center) → amber → teal → indigo (periphery)
+function ageToRGB(age) {
+  const t = Math.min(1, age / 7000);
+  let r, g, b;
+  if (t < 0.35) {
+    const s = t / 0.35;
+    r = Math.round(230 + s * (50  - 230));
+    g = Math.round(190 + s * (190 - 190));
+    b = Math.round(50  + s * (190 - 50));
+  } else if (t < 0.7) {
+    const s = (t - 0.35) / 0.35;
+    r = Math.round(50  + s * (80  - 50));
+    g = Math.round(190 + s * (90  - 190));
+    b = Math.round(190 + s * (220 - 190));
+  } else {
+    const s = (t - 0.7) / 0.3;
+    r = Math.round(80  + s * (50  - 80));
+    g = Math.round(90  + s * (50  - 90));
+    b = Math.round(220 + s * (240 - 220));
+  }
+  return [r, g, b];
+}
+
+function setPixel(x, y, age) {
+  const [r, g, b] = ageToRGB(age);
+  const i = (y * SIM + x) * 4;
+  pix[i]   = r;
+  pix[i+1] = g;
+  pix[i+2] = b;
+}
+
+// ─── Init cluster ─────────────────────────────────────────────────────────────
+
+function seed() {
+  // Small seed cross at center
+  const seeds = [[0,0],[1,0],[-1,0],[0,1],[0,-1]];
+  for (const [dx, dy] of seeds) {
+    const x = CX + dx, y = CY + dy;
+    if (x >= 0 && x < SIM && y >= 0 && y < SIM) {
+      grid[y * SIM + x] = ++clusterSize;
+      setPixel(x, y, clusterSize);
+    }
+  }
+  maxDist = 2;
+}
+
+// ─── Walkers ──────────────────────────────────────────────────────────────────
+
+const NUM_WALKERS = 400;
+const wx = new Int16Array(NUM_WALKERS);
+const wy = new Int16Array(NUM_WALKERS);
+
+function spawnAt(i) {
+  const r = maxDist + 10 + Math.random() * 5;
+  const a = Math.random() * Math.PI * 2;
+  wx[i] = Math.round(CX + r * Math.cos(a));
+  wy[i] = Math.round(CY + r * Math.sin(a));
+}
+
+for (let i = 0; i < NUM_WALKERS; i++) spawnAt(i);
+
+// ─── Precomputed: dx/dy offsets ───────────────────────────────────────────────
+
+const NDX = [1, -1, 0, 0];
+const NDY = [0,  0, 1,-1];
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+
+let frameCount = 0;
+
+function tick() {
+  for (let i = 0; i < NUM_WALKERS; i++) {
+    // Walk
+    const d = Math.floor(Math.random() * 4);
+    wx[i] += NDX[d];
+    wy[i] += NDY[d];
+
+    const x = wx[i], y = wy[i];
+
+    // Respawn if out of bounds or too far
+    if (x < 1 || x >= SIM-1 || y < 1 || y >= SIM-1) {
+      spawnAt(i); continue;
+    }
+    const dr = Math.sqrt((x-CX)**2 + (y-CY)**2);
+    if (dr > maxDist + 25) {
+      spawnAt(i); continue;
+    }
+
+    // Already occupied?
+    if (grid[y * SIM + x] > 0) continue;
+
+    // Adjacent to cluster?
+    let adj = false;
+    for (let k = 0; k < 4; k++) {
+      if (grid[(y + NDY[k]) * SIM + (x + NDX[k])] > 0) { adj = true; break; }
+    }
+
+    if (adj) {
+      // Stick
+      const age = ++clusterSize;
+      grid[y * SIM + x] = age;
+      setPixel(x, y, age);
+      if (dr > maxDist) maxDist = dr;
+      spawnAt(i);
+    }
+  }
+
+  ctx.putImageData(imgBuf, 0, 0);
+
+  if (frameCount % 15 === 0) {
+    document.getElementById('s-count').textContent = clusterSize.toLocaleString('fr-FR');
+    document.getElementById('s-radius').textContent = Math.round(maxDist);
+  }
+
+  // Stop if crystal fills most of the space
+  if (maxDist < SIM * 0.46) {
+    frameCount++;
+    requestAnimationFrame(tick);
+  } else {
+    // Done — restart after pause
+    setTimeout(restart, 5000);
+  }
+}
+
+function restart() {
+  grid.fill(0);
+  pix.fill(0);
+  for (let i = 3; i < pix.length; i += 4) pix[i] = 255;
+  clusterSize = 0;
+  maxDist = 0;
+  frameCount = 0;
+  seed();
+  for (let i = 0; i < NUM_WALKERS; i++) spawnAt(i);
+  requestAnimationFrame(tick);
+}
+
+seed();
+ctx.putImageData(imgBuf, 0, 0);
+requestAnimationFrame(tick);
+
+// Double-click: restart immediately
+canvas.addEventListener('dblclick', restart);
+</script>
+</body>
+</html>

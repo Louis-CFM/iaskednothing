@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SABLE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030201; overflow:hidden; cursor:none; }
+  canvas { position:fixed; inset:0; display:block; image-rendering:pixelated; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(200,170,100,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #sub {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.15em; line-height:2;
+    color:rgba(200,170,100,0.18); pointer-events:none;
+  }
+  #sub span { color:rgba(230,200,130,0.35); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="sub">grains: <span id="s-grains">0</span> · glisser pour verser</div>
+<div id="label">SABLE · physique cellulaire</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+// Simulation at reduced resolution for performance
+const SCALE = 3; // px per cell
+let W, H, COLS, ROWS;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  COLS = Math.floor(W / SCALE);
+  ROWS = Math.floor(H / SCALE);
+}
+resize(); addEventListener('resize', () => { resize(); initGrid(); });
+
+// ─── Cell types ───────────────────────────────────────────────────────────────
+
+const EMPTY  = 0;
+const SAND   = 1;
+const STONE  = 2;
+const WATER  = 3;
+
+// Grid: Uint8Array for type, separate Uint8Array for color variation
+let grid, shade;
+
+function initGrid() {
+  grid  = new Uint8Array(COLS * ROWS);
+  shade = new Uint8Array(COLS * ROWS);
+}
+initGrid();
+
+function idx(x, y) { return y * COLS + x; }
+
+function inBounds(x, y) {
+  return x >= 0 && x < COLS && y >= 0 && y < ROWS;
+}
+
+function get(x, y) { return inBounds(x, y) ? grid[idx(x, y)] : STONE; }
+function set(x, y, v) {
+  if (!inBounds(x, y)) return;
+  grid[idx(x, y)]  = v;
+  shade[idx(x, y)] = Math.floor(Math.random() * 30);
+}
+
+// ─── Physics ──────────────────────────────────────────────────────────────────
+
+// Process bottom-to-top, alternating left/right scan to avoid bias
+let frame = 0;
+
+function stepSand(x, y) {
+  // Fall down
+  if (get(x, y+1) === EMPTY) {
+    const i = idx(x, y), j = idx(x, y+1);
+    grid[j] = grid[i]; shade[j] = shade[i];
+    grid[i] = EMPTY;
+    return;
+  }
+  // Slide diagonally — alternate bias per frame
+  const bias = (frame + x) % 2 === 0 ? 1 : -1;
+  const dl = x - bias, dr = x + bias;
+  if (get(dl, y+1) === EMPTY) {
+    const i = idx(x, y), j = idx(dl, y+1);
+    grid[j] = grid[i]; shade[j] = shade[i];
+    grid[i] = EMPTY;
+    return;
+  }
+  if (get(dr, y+1) === EMPTY) {
+    const i = idx(x, y), j = idx(dr, y+1);
+    grid[j] = grid[i]; shade[j] = shade[i];
+    grid[i] = EMPTY;
+  }
+}
+
+function stepWater(x, y) {
+  // Fall down
+  if (get(x, y+1) === EMPTY) {
+    const i = idx(x, y), j = idx(x, y+1);
+    grid[j] = WATER; shade[j] = shade[i];
+    grid[i] = EMPTY;
+    return;
+  }
+  // Spread sideways (more aggressively than sand)
+  const bias = (frame + x) % 2 === 0 ? 1 : -1;
+  for (let step = 1; step <= 3; step++) {
+    const nx = x + bias * step;
+    if (get(nx, y) === EMPTY) {
+      const i = idx(x, y), j = idx(nx, y);
+      grid[j] = WATER; shade[j] = shade[i];
+      grid[i] = EMPTY;
+      return;
+    }
+    if (get(nx, y) !== EMPTY) break;
+  }
+  for (let step = 1; step <= 3; step++) {
+    const nx = x - bias * step;
+    if (get(nx, y) === EMPTY) {
+      const i = idx(x, y), j = idx(nx, y);
+      grid[j] = WATER; shade[j] = shade[i];
+      grid[i] = EMPTY;
+      return;
+    }
+    if (get(nx, y) !== EMPTY) break;
+  }
+}
+
+function step() {
+  // Scan bottom-to-top to let particles fall naturally
+  for (let y = ROWS - 2; y >= 0; y--) {
+    for (let xBase = 0; xBase < COLS; xBase++) {
+      // Alternate scan direction per row
+      const x = (y % 2 === 0) ? xBase : COLS - 1 - xBase;
+      const t = get(x, y);
+      if (t === SAND)  stepSand(x, y);
+      if (t === WATER) stepWater(x, y);
+    }
+  }
+  frame++;
+}
+
+// ─── Rendering ────────────────────────────────────────────────────────────────
+
+const imgData = ctx.createImageData(SCALE, SCALE);
+const pix = imgData.data;
+for (let i = 3; i < pix.length; i += 4) pix[i] = 255; // alpha
+
+function cellColor(type, sh) {
+  switch (type) {
+    case SAND: {
+      const v = sh * 2;
+      return [180 + v, 145 + v, 60 + v >> 1];
+    }
+    case STONE: {
+      const v = sh;
+      return [50 + v, 48 + v, 45 + v];
+    }
+    case WATER: {
+      const v = sh;
+      return [40 + v, 100 + v, 200 + (v >> 1)];
+    }
+    default: return null;
+  }
+}
+
+function draw() {
+  ctx.fillStyle = '#030201';
+  ctx.fillRect(0, 0, W, H);
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const t = grid[idx(x, y)];
+      if (t === EMPTY) continue;
+      const col = cellColor(t, shade[idx(x, y)]);
+      if (!col) continue;
+      pix[0] = col[0]; pix[1] = col[1]; pix[2] = col[2];
+      ctx.putImageData(imgData, x * SCALE, y * SCALE);
+    }
+  }
+}
+
+// ─── Input ────────────────────────────────────────────────────────────────────
+
+let mouse = { x: -1, y: -1, down: false };
+let pouring = SAND;
+
+function pour(cx, cy, type) {
+  const bx = Math.floor(cx / SCALE);
+  const by = Math.floor(cy / SCALE);
+  const r = 2;
+  for (let dy = -r; dy <= r; dy++) {
+    for (let dx = -r; dx <= r; dx++) {
+      if (Math.random() < 0.5) continue;
+      if (dx*dx + dy*dy > r*r) continue;
+      set(bx + dx, by + dy, type);
+    }
+  }
+}
+
+canvas.addEventListener('mousedown', e => { mouse.down = true; mouse.x = e.clientX; mouse.y = e.clientY; });
+canvas.addEventListener('mouseup',   () => { mouse.down = false; });
+canvas.addEventListener('mousemove', e => { mouse.x = e.clientX; mouse.y = e.clientY; });
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault();
+  mouse.down = true;
+  mouse.x = e.touches[0].clientX;
+  mouse.y = e.touches[0].clientY;
+}, { passive: false });
+canvas.addEventListener('touchend',   () => { mouse.down = false; });
+canvas.addEventListener('touchmove',  e => {
+  e.preventDefault();
+  mouse.x = e.touches[0].clientX;
+  mouse.y = e.touches[0].clientY;
+}, { passive: false });
+
+// Right click → water
+canvas.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  pouring = (pouring === WATER ? SAND : WATER);
+});
+
+// Double click → clear
+canvas.addEventListener('dblclick', () => { initGrid(); });
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+
+const STEPS_PER_FRAME = 3;
+let grainCount = 0;
+let fN = 0;
+
+function tick() {
+  if (mouse.down) {
+    pour(mouse.x, mouse.y, pouring);
+  }
+
+  for (let s = 0; s < STEPS_PER_FRAME; s++) step();
+
+  draw();
+
+  // Draw cursor
+  if (mouse.x >= 0) {
+    ctx.beginPath();
+    ctx.arc(mouse.x, mouse.y, 6, 0, Math.PI * 2);
+    ctx.strokeStyle = pouring === WATER
+      ? 'rgba(80,140,220,0.5)'
+      : 'rgba(200,170,100,0.5)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  }
+
+  if (fN % 20 === 0) {
+    grainCount = 0;
+    for (let i = 0; i < grid.length; i++) if (grid[i] !== EMPTY) grainCount++;
+    document.getElementById('s-grains').textContent = grainCount.toLocaleString('fr-FR');
+  }
+
+  fN++;
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CROISSANCE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030508; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(130,180,130,0.12);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #gen-label {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:0.9rem; color:rgba(150,200,150,0.18);
+    letter-spacing:0.1em; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="gen-label" id="gen-lbl"></div>
+<div id="label">CROISSANCE · L-système</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', () => { resize(); restart(); });
+
+// ─── L-system definitions ─────────────────────────────────────────────────────
+
+const SYSTEMS = [
+  {
+    name: 'plante arborescente',
+    axiom: 'X',
+    rules: { 'X': 'F+[[X]-X]-F[-FX]+X', 'F': 'FF' },
+    angle: 25, generations: 5,
+    color: { stem: [80, 160, 90], tip: [180, 220, 120], flower: [220, 200, 120] },
+  },
+  {
+    name: 'fougère de Barnsley',
+    axiom: 'X',
+    rules: { 'X': 'F+[[X]-X]-F[-FX]+X', 'F': 'FF' },
+    angle: 22, generations: 5,
+    color: { stem: [60, 130, 80], tip: [120, 200, 100], flower: [200, 240, 160] },
+  },
+  {
+    name: 'arbre triangulaire',
+    axiom: 'F',
+    rules: { 'F': 'F[+F]F[-F][F]' },
+    angle: 20, generations: 4,
+    color: { stem: [100, 140, 100], tip: [160, 210, 130], flower: [240, 220, 140] },
+  },
+  {
+    name: 'branchage ouvert',
+    axiom: 'F',
+    rules: { 'F': 'FF-[-F+F+F]+[+F-F-F]' },
+    angle: 22, generations: 4,
+    color: { stem: [70, 150, 100], tip: [140, 200, 120], flower: [210, 230, 150] },
+  },
+];
+
+// ─── L-system expansion ───────────────────────────────────────────────────────
+
+function expand(system, n) {
+  let s = system.axiom;
+  for (let i = 0; i < n; i++) {
+    let next = '';
+    for (const ch of s) next += (system.rules[ch] || ch);
+    s = next;
+  }
+  return s;
+}
+
+// ─── Turtle interpretation ────────────────────────────────────────────────────
+
+function interpretToSegments(str, angle, baseLen, startX, startY) {
+  const segments = [];
+  const stack = [];
+  let x = startX, y = startY, dir = -Math.PI / 2; // start facing up
+  let depth = 0;
+
+  for (const ch of str) {
+    if (ch === 'F') {
+      const len = baseLen * Math.pow(0.9, depth * 0.5);
+      const nx = x + Math.cos(dir) * len;
+      const ny = y + Math.sin(dir) * len;
+      segments.push({ x1:x, y1:y, x2:nx, y2:ny, depth, stackLen: stack.length });
+      x = nx; y = ny;
+    } else if (ch === '+') {
+      dir += angle * Math.PI / 180;
+    } else if (ch === '-') {
+      dir -= angle * Math.PI / 180;
+    } else if (ch === '[') {
+      stack.push({ x, y, dir, depth });
+      depth++;
+    } else if (ch === ']') {
+      const s = stack.pop();
+      x = s.x; y = s.y; dir = s.dir; depth = s.depth;
+    }
+  }
+
+  return segments;
+}
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let segments = [];
+let drawIdx = 0;
+let currentSystem = 0;
+let maxDepth = 0;
+let genLabel = document.getElementById('gen-lbl');
+
+// Speed: segments per frame
+let speed = 15;
+
+function restart() {
+  ctx.fillStyle = '#030508';
+  ctx.fillRect(0, 0, W, H);
+
+  const sys = SYSTEMS[currentSystem];
+  genLabel.textContent = sys.name;
+
+  const maxIter = sys.generations;
+
+  // Estimate segment count and adjust scale
+  const str = expand(sys, maxIter);
+  const segCount = (str.match(/F/g) || []).length;
+  const baseLen = Math.min(W, H) * 0.6 / Math.pow(2.2, maxIter);
+  const startX = W / 2 + (Math.random() - 0.5) * W * 0.1;
+  const startY = H * 0.95;
+
+  segments = interpretToSegments(str, sys.angle, baseLen, startX, startY);
+  maxDepth = Math.max(...segments.map(s => s.depth), 1);
+  drawIdx = 0;
+  speed = Math.max(5, Math.floor(segments.length / 180)); // draw in ~3s
+}
+
+// ─── Color for segment ────────────────────────────────────────────────────────
+
+function segmentColor(seg) {
+  const sys = SYSTEMS[currentSystem];
+  const t = seg.depth / Math.max(maxDepth, 1);
+  const { stem, tip } = sys.color;
+
+  const r = Math.round(stem[0] + (tip[0] - stem[0]) * t);
+  const g = Math.round(stem[1] + (tip[1] - stem[1]) * t);
+  const b = Math.round(stem[2] + (tip[2] - stem[2]) * t);
+  const alpha = 0.5 + t * 0.4;
+  const width  = Math.max(0.4, 2.5 - t * 2.2);
+
+  return { color: `rgba(${r},${g},${b},${alpha})`, width };
+}
+
+function drawFlower(x, y) {
+  const sys = SYSTEMS[currentSystem];
+  const [r,g,b] = sys.color.flower;
+  const petals = 5 + Math.floor(Math.random() * 3);
+  const fr = 2.5 + Math.random() * 2.5;
+  for (let i = 0; i < petals; i++) {
+    const a = (i / petals) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.ellipse(x + Math.cos(a)*fr, y + Math.sin(a)*fr, fr*0.6, fr*0.4, a, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(${r},${g},${b},0.6)`;
+    ctx.fill();
+  }
+  ctx.beginPath();
+  ctx.arc(x, y, fr*0.4, 0, Math.PI*2);
+  ctx.fillStyle = `rgba(255,245,200,0.7)`;
+  ctx.fill();
+}
+
+// ─── Draw loop ────────────────────────────────────────────────────────────────
+
+let frame = 0;
+let restartTimer = null;
+
+function tick() {
+  if (drawIdx < segments.length) {
+    const end = Math.min(drawIdx + speed, segments.length);
+    for (let i = drawIdx; i < end; i++) {
+      const seg = segments[i];
+      const { color, width } = segmentColor(seg);
+      ctx.beginPath();
+      ctx.moveTo(seg.x1, seg.y1);
+      ctx.lineTo(seg.x2, seg.y2);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Flower at tips (deepest segments)
+      if (seg.depth === maxDepth && Math.random() < 0.35) {
+        drawFlower(seg.x2, seg.y2);
+      }
+    }
+    drawIdx = end;
+
+    if (drawIdx >= segments.length) {
+      // Move to next system after a pause
+      restartTimer = setTimeout(() => {
+        currentSystem = (currentSystem + 1) % SYSTEMS.length;
+        ctx.fillStyle = 'rgba(3,5,8,0.95)';
+        ctx.fillRect(0, 0, W, H);
+        restart();
+      }, 8000);
+    }
+  }
+
+  frame++;
+  requestAnimationFrame(tick);
+}
+
+restart();
+requestAnimationFrame(tick);
+
+// Click: next system immediately
+canvas.addEventListener('click', () => {
+  if (restartTimer) clearTimeout(restartTimer);
+  currentSystem = (currentSystem + 1) % SYSTEMS.length;
+  ctx.fillStyle = 'rgba(3,5,8,0.96)';
+  ctx.fillRect(0, 0, W, H);
+  restart();
+});
+</script>
+</body>
+</html>

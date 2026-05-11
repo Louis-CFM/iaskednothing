@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RÉSEAU</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#01020a; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(100,140,200,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #sub {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.12em; line-height:2;
+    color:rgba(100,140,195,0.18); pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="sub">propagation: <span id="s-count">0</span> · couche: <span id="s-layer">7</span></div>
+<div id="label">RÉSEAU · propagation avant</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+// ─── Architecture ─────────────────────────────────────────────────────────────
+// Loosely inspired by transformer-style widening then narrowing
+
+const LAYER_SIZES = [5, 10, 18, 24, 24, 18, 10, 5];
+const NUM_LAYERS  = LAYER_SIZES.length;
+
+// ─── Layout ───────────────────────────────────────────────────────────────────
+
+let nodes  = []; // nodes[layer][idx] = {x, y, glow, id}
+let edges  = []; // {li, ni, nj, active}
+
+function buildLayout() {
+  nodes = [];
+  edges = [];
+
+  const PAD_X = W * 0.12;
+  const PAD_Y = H * 0.18;
+  const usableW = W - PAD_X * 2;
+  const usableH = H - PAD_Y * 2;
+
+  for (let li = 0; li < NUM_LAYERS; li++) {
+    const count = LAYER_SIZES[li];
+    const x = PAD_X + (li / (NUM_LAYERS - 1)) * usableW;
+    const col = [];
+    for (let ni = 0; ni < count; ni++) {
+      const y = PAD_Y + ((ni + 0.5) / count) * usableH;
+      col.push({ x, y, glow: 0, glow2: 0 });
+    }
+    nodes.push(col);
+  }
+
+  // Build edge list (all inter-layer connections)
+  for (let li = 0; li < NUM_LAYERS - 1; li++) {
+    for (let ni = 0; ni < LAYER_SIZES[li]; ni++) {
+      for (let nj = 0; nj < LAYER_SIZES[li + 1]; nj++) {
+        edges.push({ li, ni, nj, active: 0 });
+      }
+    }
+  }
+}
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  buildLayout();
+}
+resize();
+addEventListener('resize', resize);
+
+// ─── Particles ────────────────────────────────────────────────────────────────
+
+// Each particle: traverses one path through the network (one node per layer)
+
+const MAX_PARTICLES = 55;
+const particles = [];
+
+function spawnParticle() {
+  const path = LAYER_SIZES.map(count => Math.floor(Math.random() * count));
+  return {
+    path,
+    progress: 0,           // 0..NUM_LAYERS-1 (continuous)
+    speed: 0.018 + Math.random() * 0.012,
+    alpha: 0.7 + Math.random() * 0.3,
+    hue: 200 + Math.floor(Math.random() * 60), // blue-cyan
+  };
+}
+
+for (let i = 0; i < MAX_PARTICLES; i++) {
+  const p = spawnParticle();
+  p.progress = Math.random() * (NUM_LAYERS - 1); // stagger
+  particles.push(p);
+}
+
+// Edge activation lookup: edgeMap[li][ni][nj] = index in edges[]
+const edgeMap = [];
+let edgeIdx = 0;
+for (let li = 0; li < NUM_LAYERS - 1; li++) {
+  const row = [];
+  for (let ni = 0; ni < LAYER_SIZES[li]; ni++) {
+    const col = [];
+    for (let nj = 0; nj < LAYER_SIZES[li + 1]; nj++) {
+      col.push(edgeIdx++);
+    }
+    row.push(col);
+  }
+  edgeMap.push(row);
+}
+
+// ─── Draw helpers ─────────────────────────────────────────────────────────────
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+// Cubic easing
+function ease(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+let totalPasses = 0;
+
+function tick() {
+  // Fading background
+  ctx.fillStyle = 'rgba(1, 2, 10, 0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Decay node glow
+  for (const col of nodes) {
+    for (const n of col) {
+      n.glow  *= 0.90;
+      n.glow2 *= 0.94; // slower pulse
+    }
+  }
+
+  // Decay edge activation
+  for (const e of edges) {
+    e.active *= 0.88;
+  }
+
+  // ── Draw edges (very faint background structure) ──────────────────────────────
+  for (const e of edges) {
+    const a = nodes[e.li][e.ni];
+    const b = nodes[e.li + 1][e.nj];
+    const alpha = 0.025 + e.active * 0.20;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = `rgba(80, 120, 200, ${alpha})`;
+    ctx.lineWidth = e.active > 0.1 ? 0.8 : 0.3;
+    ctx.stroke();
+  }
+
+  // ── Advance particles ─────────────────────────────────────────────────────────
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
+    p.progress += p.speed;
+
+    if (p.progress >= NUM_LAYERS - 1) {
+      // Finished — restart
+      const fresh = spawnParticle();
+      particles[i] = fresh;
+      totalPasses++;
+      continue;
+    }
+
+    const li = Math.floor(p.progress);
+    const t  = p.progress - li;
+
+    if (li >= NUM_LAYERS - 1) continue;
+
+    const na = nodes[li][p.path[li]];
+    const nb = nodes[li + 1][p.path[li + 1]];
+
+    // Activate nodes
+    na.glow  = Math.max(na.glow,  1.0);
+    na.glow2 = Math.max(na.glow2, 1.0);
+    nb.glow  = Math.max(nb.glow,  t * 1.0);
+
+    // Activate edge
+    const ei = edgeMap[li][p.path[li]][p.path[li + 1]];
+    edges[ei].active = Math.max(edges[ei].active, 1.0);
+
+    // Particle position (smooth cubic interpolation)
+    const et = ease(t);
+    const px = lerp(na.x, nb.x, et);
+    const py = lerp(na.y, nb.y, et);
+
+    // Draw particle
+    const alpha = p.alpha * (1 - Math.abs(t - 0.5) * 0.4);
+    ctx.beginPath();
+    ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${p.hue}, 80%, 80%, ${alpha})`;
+    ctx.fill();
+
+    // Particle glow
+    const grad = ctx.createRadialGradient(px, py, 0, px, py, 12);
+    grad.addColorStop(0, `hsla(${p.hue}, 80%, 85%, ${alpha * 0.3})`);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath();
+    ctx.arc(px, py, 12, 0, Math.PI * 2);
+    ctx.fillStyle = grad;
+    ctx.fill();
+  }
+
+  // ── Draw nodes ────────────────────────────────────────────────────────────────
+  for (const col of nodes) {
+    for (const n of col) {
+      const g = n.glow;
+      const r = 1.8 + g * 3.5;
+      const alpha = 0.15 + g * 0.75;
+
+      // Core
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${Math.round(80 + g*160)}, ${Math.round(100 + g*140)}, ${Math.round(180 + g*70)}, ${alpha})`;
+      ctx.fill();
+
+      // Glow halo
+      if (g > 0.05) {
+        const halo = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, 20 * g);
+        halo.addColorStop(0, `rgba(120, 180, 255, ${g * 0.18})`);
+        halo.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 20 * g, 0, Math.PI * 2);
+        ctx.fillStyle = halo;
+        ctx.fill();
+      }
+    }
+  }
+
+  // ── UI ────────────────────────────────────────────────────────────────────────
+  if (frameN % 20 === 0) {
+    document.getElementById('s-count').textContent = totalPasses.toLocaleString('fr-FR');
+    document.getElementById('s-layer').textContent = NUM_LAYERS;
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

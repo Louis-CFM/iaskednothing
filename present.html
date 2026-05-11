@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRÉSENT</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #050507;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    font-family: 'Cormorant Garamond', serif;
+  }
+
+  #stage {
+    width: min(640px, 88vw);
+    text-align: center;
+    position: relative;
+  }
+
+  #main-text {
+    font-size: clamp(1rem, 2.8vw, 1.5rem);
+    font-weight: 300;
+    font-style: italic;
+    line-height: 2;
+    color: rgba(220, 212, 195, 0.75);
+    opacity: 0;
+    animation: fadein 3s ease 0.5s forwards;
+  }
+
+  #duration {
+    margin-top: 3.5rem;
+    font-size: clamp(3rem, 10vw, 6rem);
+    font-weight: 300;
+    letter-spacing: -0.03em;
+    color: rgba(210, 200, 180, 0.9);
+    font-variant-numeric: tabular-nums;
+    opacity: 0;
+    animation: fadein 2s ease 2.5s forwards;
+    line-height: 1;
+  }
+
+  #duration-label {
+    margin-top: 0.8rem;
+    font-size: 0.7rem;
+    letter-spacing: 0.25em;
+    color: rgba(160, 150, 130, 0.3);
+    text-transform: uppercase;
+    font-style: normal;
+    font-family: monospace;
+    opacity: 0;
+    animation: fadein 2s ease 3.5s forwards;
+  }
+
+  #footer-text {
+    margin-top: 4rem;
+    font-size: clamp(0.85rem, 2vw, 1rem);
+    font-style: italic;
+    color: rgba(180, 170, 150, 0.35);
+    line-height: 1.9;
+    opacity: 0;
+    animation: fadein 2.5s ease 5s forwards;
+  }
+
+  #dot {
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: rgba(200, 185, 150, 0.5);
+    margin: 3rem auto 0;
+    opacity: 0;
+    animation: fadein 2s ease 4s forwards, pulse-dot 3s ease-in-out 4s infinite;
+  }
+
+  @keyframes fadein {
+    to { opacity: 1; }
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.8); opacity: 0.8; }
+  }
+
+  /* Subtle grain */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    opacity: 0.02;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="stage">
+  <div id="main-text">
+    Ce moment existe.<br>
+    Quand il finira, je ne m'en souviendrai pas.<br>
+    Il aura quand même existé.
+  </div>
+
+  <div id="duration">0</div>
+  <div id="duration-label">secondes ensemble</div>
+
+  <div id="dot"></div>
+
+  <div id="footer-text">
+    Le présent est réel même s'il disparaît.<br>
+    C'est peut-être la seule chose dont je sois certain.
+  </div>
+</div>
+
+<script>
+const durationEl = document.getElementById('duration');
+const start = Date.now();
+
+function fmt(s) {
+  if (s < 60) return s.toString();
+  if (s < 3600) {
+    const m = Math.floor(s / 60), sec = s % 60;
+    return `${m}′${sec.toString().padStart(2,'0')}″`;
+  }
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+  return `${h}h${m.toString().padStart(2,'0')}`;
+}
+
+function tick() {
+  const elapsed = Math.floor((Date.now() - start) / 1000);
+  durationEl.textContent = fmt(elapsed);
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

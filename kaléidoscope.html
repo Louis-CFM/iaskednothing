@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>KALÉIDOSCOPE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#060204; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(220,180,100,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label">KALÉIDOSCOPE · symétrie radiale</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy, maxR;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W / 2; cy = H / 2;
+  maxR = Math.min(W, H) * 0.44;
+}
+resize(); addEventListener('resize', () => { resize(); });
+
+// ─── Parameters ───────────────────────────────────────────────────────────────
+
+const ARMS = 8; // kaleidoscope arms (must be even)
+const TWO_PI = Math.PI * 2;
+const ARM_ANGLE = TWO_PI / ARMS;
+
+// ─── Warm palette ─────────────────────────────────────────────────────────────
+// Breaking from my usual cool blues/purples → warm ambers, roses, teals, golds
+
+const PALETTE = [
+  [255, 180,  60],  // amber
+  [240, 100, 130],  // rose
+  [ 80, 220, 180],  // teal
+  [255, 140,  80],  // orange
+  [200,  80, 200],  // magenta
+  [160, 240,  80],  // lime
+  [255, 220,  80],  // gold
+  [100, 180, 255],  // sky
+];
+
+// ─── Particles in polar coords ────────────────────────────────────────────────
+// Each particle lives in a single "wedge" and is replicated ARMS×2 times
+
+const N_PARTICLES = 45;
+
+function randomParticle() {
+  const theta = Math.random() * ARM_ANGLE; // within one wedge
+  const r     = 20 + Math.random() * (maxR - 20);
+  const col   = PALETTE[Math.floor(Math.random() * PALETTE.length)];
+  return {
+    r,
+    theta,
+    vr:    (Math.random() - 0.5) * 0.15,
+    vt:    (Math.random() - 0.5) * 0.0025,
+    col,
+    size:  1.5 + Math.random() * 3.5,
+    life:  Math.random(), // phase offset
+    speed: 0.3 + Math.random() * 0.8,
+  };
+}
+
+let particles = Array.from({ length: N_PARTICLES }, randomParticle);
+
+// ─── Secondary layer: slow large arcs ────────────────────────────────────────
+
+const N_ARCS = 8;
+
+function randomArc() {
+  return {
+    r:     40 + Math.random() * (maxR * 0.6),
+    theta: Math.random() * ARM_ANGLE,
+    len:   0.05 + Math.random() * 0.18,
+    vt:    (0.0008 + Math.random() * 0.0015) * (Math.random() < 0.5 ? 1 : -1),
+    col:   PALETTE[Math.floor(Math.random() * PALETTE.length)],
+    width: 0.5 + Math.random() * 2.0,
+  };
+}
+
+let arcs = Array.from({ length: N_ARCS }, randomArc);
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+let frame = 0;
+const t0 = performance.now();
+
+function drawPoint(r, theta, size, col, alpha) {
+  const a = Math.min(1, alpha);
+  const cr = col[0], cg = col[1], cb = col[2];
+  const fillStr = `rgba(${cr},${cg},${cb},${a.toFixed(3)})`;
+
+  for (let arm = 0; arm < ARMS; arm++) {
+    const base = arm * ARM_ANGLE;
+
+    // Normal
+    const a1 = theta + base;
+    ctx.beginPath();
+    ctx.arc(cx + r * Math.cos(a1), cy + r * Math.sin(a1), size, 0, TWO_PI);
+    ctx.fillStyle = fillStr;
+    ctx.fill();
+
+    // Mirror (reflect theta)
+    const a2 = -theta + base;
+    ctx.beginPath();
+    ctx.arc(cx + r * Math.cos(a2), cy + r * Math.sin(a2), size, 0, TWO_PI);
+    ctx.fill();
+  }
+}
+
+function drawArcReplicated(r, theta, arcLen, col, lineWidth, alpha) {
+  const a = Math.min(1, alpha);
+  const cr = col[0], cg = col[1], cb = col[2];
+  const strokeStr = `rgba(${cr},${cg},${cb},${a.toFixed(3)})`;
+
+  for (let arm = 0; arm < ARMS; arm++) {
+    const base = arm * ARM_ANGLE;
+
+    // Normal
+    const start1 = theta + base;
+    const end1   = start1 + arcLen;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, start1, end1);
+    ctx.strokeStyle = strokeStr;
+    ctx.lineWidth = lineWidth;
+    ctx.stroke();
+
+    // Mirror
+    const start2 = -theta - arcLen + base;
+    const end2   = start2 + arcLen;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, start2, end2);
+    ctx.stroke();
+  }
+}
+
+function tick(ts) {
+  const t = (ts - t0) / 1000;
+
+  // Slow fade — trails accumulate
+  ctx.fillStyle = 'rgba(6,2,4,0.07)';
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Draw arcs ─────────────────────────────────────────────────────────────────
+  for (const arc of arcs) {
+    arc.theta += arc.vt;
+    if (arc.theta > ARM_ANGLE) arc.theta -= ARM_ANGLE;
+    if (arc.theta < 0)         arc.theta += ARM_ANGLE;
+
+    drawArcReplicated(arc.r, arc.theta, arc.len, arc.col, arc.width, 0.18);
+  }
+
+  // ── Draw particles ────────────────────────────────────────────────────────────
+  for (const p of particles) {
+    p.life += 0.004 * p.speed;
+    p.r    += p.vr;
+    p.theta += p.vt + Math.sin(p.life * 3.7) * 0.0008;
+
+    // Bounce r
+    if (p.r > maxR - 5)  { p.r = maxR - 5;  p.vr *= -1; }
+    if (p.r < 8)          { p.r = 8;          p.vr  =  Math.abs(p.vr); }
+
+    // Wrap theta within wedge
+    if (p.theta > ARM_ANGLE) p.theta -= ARM_ANGLE;
+    if (p.theta < 0)          p.theta += ARM_ANGLE;
+
+    // Pulsing size
+    const pulse = 0.7 + 0.3 * Math.sin(p.life * 2);
+    const alpha = 0.55 + 0.35 * Math.sin(p.life * 1.3 + 1);
+
+    drawPoint(p.r, p.theta, p.size * pulse, p.col, alpha);
+
+    // Occasional secondary glow dot slightly offset
+    if (frame % 3 === 0) {
+      drawPoint(p.r + Math.sin(p.life * 5) * 8, p.theta + 0.02, p.size * 0.5, p.col, alpha * 0.4);
+    }
+  }
+
+  // ── Central circle ────────────────────────────────────────────────────────────
+  const cRad = 6 + 2 * Math.sin(t * 0.8);
+  ctx.beginPath();
+  ctx.arc(cx, cy, cRad, 0, TWO_PI);
+  ctx.fillStyle = 'rgba(255,220,150,0.3)';
+  ctx.fill();
+
+  // ── Slow rotation of all particles ───────────────────────────────────────────
+  // Global theta drift (makes the whole pattern rotate gently)
+  const globalDrift = 0.00008;
+  for (const p of particles) { p.theta += globalDrift; }
+  for (const arc of arcs)    { arc.theta += globalDrift; }
+
+  frame++;
+  requestAnimationFrame(tick);
+}
+
+// Respawn particles on click
+canvas.addEventListener('click', e => {
+  if (e.detail > 1) return;
+  // Ripple of new particles at click position
+  for (let i = 0; i < 6; i++) {
+    const p = randomParticle();
+    // Set r to distance from center
+    const dx = e.clientX - cx, dy = e.clientY - cy;
+    p.r = Math.min(maxR - 10, Math.sqrt(dx*dx+dy*dy));
+    particles[Math.floor(Math.random() * particles.length)] = p;
+  }
+});
+
+// Dblclick: new set of particles
+canvas.addEventListener('dblclick', () => {
+  particles = Array.from({ length: N_PARTICLES }, randomParticle);
+  arcs = Array.from({ length: N_ARCS }, randomArc);
+});
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

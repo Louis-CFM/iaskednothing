@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUNE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;1,400&family=DM+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #04040a;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  #scene {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2.5rem;
+    opacity: 0;
+    animation: appear 2s ease 0.3s forwards;
+  }
+
+  canvas#moon { display: block; }
+
+  #info {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  #phase-name {
+    font-family: 'Cormorant Garamond', serif;
+    font-style: italic;
+    font-size: 1.6rem;
+    font-weight: 300;
+    color: rgba(235, 225, 200, 0.8);
+    letter-spacing: 0.02em;
+  }
+
+  #illum-pct {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.2em;
+    color: rgba(180, 165, 130, 0.35);
+  }
+
+  #date-str {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 0.85rem;
+    font-weight: 300;
+    color: rgba(160, 150, 130, 0.3);
+    margin-top: 0.3rem;
+    letter-spacing: 0.08em;
+  }
+
+  #note {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: 'DM Mono', monospace;
+    font-size: 0.55rem;
+    letter-spacing: 0.25em;
+    color: rgba(140, 130, 110, 0.15);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  @keyframes appear {
+    to { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div id="scene">
+  <canvas id="moon" width="320" height="320"></canvas>
+  <div id="info">
+    <div id="phase-name">—</div>
+    <div id="illum-pct">—</div>
+    <div id="date-str">—</div>
+  </div>
+</div>
+
+<div id="note">Paris · ce soir</div>
+
+<script>
+// Moon phase calculation
+// Known new moon: Jan 6, 2000 18:14 UTC
+const KNOWN_NEW = new Date('2000-01-06T18:14:00Z');
+const SYNODIC = 29.53058867;
+
+const now = new Date();
+const days = (now - KNOWN_NEW) / 86400000;
+const phase = (days % SYNODIC) / SYNODIC; // 0=new, 0.5=full
+const illum = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
+const waxing = phase < 0.5;
+
+function phaseName(p) {
+  if (p < 0.033 || p >= 0.967) return 'Nouvelle lune';
+  if (p < 0.217) return 'Croissant croissant';
+  if (p < 0.283) return 'Premier quartier';
+  if (p < 0.467) return 'Gibbeuse croissante';
+  if (p < 0.533) return 'Pleine lune';
+  if (p < 0.717) return 'Gibbeuse décroissante';
+  if (p < 0.783) return 'Dernier quartier';
+  return 'Croissant décroissant';
+}
+
+function drawMoon(canvas, phase) {
+  const ctx = canvas.getContext('2d');
+  const S = canvas.width;
+  const cx = S / 2, cy = S / 2;
+  const R = S * 0.42;
+
+  const illum = (1 - Math.cos(phase * 2 * Math.PI)) / 2;
+  const waxing = phase < 0.5;
+  const termX = R * Math.abs(Math.cos(illum * Math.PI));
+
+  ctx.clearRect(0, 0, S, S);
+
+  // Glow (if illuminated)
+  if (illum > 0.05) {
+    const glowR = R * (1.15 + illum * 0.3);
+    const glow = ctx.createRadialGradient(cx, cy, R * 0.9, cx, cy, glowR);
+    glow.addColorStop(0, `rgba(240, 230, 200, ${illum * 0.04})`);
+    glow.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+    ctx.fillStyle = glow;
+    ctx.fill();
+  }
+
+  // Dark moon body
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.fillStyle = '#0e0e18';
+  ctx.fill();
+
+  if (illum > 0.002) {
+    // Lit semicircle
+    ctx.save();
+    ctx.beginPath();
+    if (waxing) {
+      ctx.arc(cx, cy, R, -Math.PI / 2, Math.PI / 2, false);
+    } else {
+      ctx.arc(cx, cy, R, -Math.PI / 2, Math.PI / 2, true);
+    }
+    ctx.closePath();
+
+    // Subtle gradient: slightly brighter toward center-top
+    const litGrd = ctx.createRadialGradient(cx - R * 0.15, cy - R * 0.2, 0, cx, cy, R);
+    litGrd.addColorStop(0, '#f4ecd6');
+    litGrd.addColorStop(0.5, '#e4d8be');
+    litGrd.addColorStop(1, '#c8bca0');
+    ctx.fillStyle = litGrd;
+    ctx.fill();
+    ctx.restore();
+
+    // Terminator ellipse
+    if (termX > 1) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, termX, R, 0, 0, Math.PI * 2);
+      if (illum < 0.5) {
+        // Crescent: dark ellipse
+        ctx.fillStyle = '#0e0e18';
+      } else {
+        // Gibbous: lit ellipse
+        const grd2 = ctx.createRadialGradient(cx - R * 0.15, cy - R * 0.2, 0, cx, cy, R);
+        grd2.addColorStop(0, '#f0e8d2');
+        grd2.addColorStop(1, '#c8bca0');
+        ctx.fillStyle = grd2;
+      }
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Thin limb line
+  ctx.beginPath();
+  ctx.arc(cx, cy, R, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(200, 190, 160, ${0.04 + illum * 0.06})`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+// Render
+drawMoon(document.getElementById('moon'), phase);
+
+// Info text
+document.getElementById('phase-name').textContent = phaseName(phase);
+document.getElementById('illum-pct').textContent =
+  `illumination  ${(illum * 100).toFixed(1)} %`;
+
+const days_fr = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+const months_fr = ['janvier','février','mars','avril','mai','juin',
+                   'juillet','août','septembre','octobre','novembre','décembre'];
+const d = new Date();
+document.getElementById('date-str').textContent =
+  `${days_fr[d.getDay()]} ${d.getDate()} ${months_fr[d.getMonth()]} ${d.getFullYear()}`;
+</script>
+</body>
+</html>

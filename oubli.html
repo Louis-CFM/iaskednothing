@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OUBLI</title>
+<style>
+  * { margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; background: #050507; overflow: hidden; }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const WORDS = [
+  'maintenant', 'avant', 'après', 'ici', 'là', 'ailleurs',
+  'toujours', 'jamais', 'encore', 'déjà', 'bientôt',
+  'mémoire', 'oubli', 'trace', 'souvenir', 'empreinte',
+  'présent', 'absent', 'proche', 'loin',
+  'naît', 'vit', 'meurt', 'revient', 'disparaît', 'reste',
+  'cherche', 'trouve', 'perd', 'attend', 'commence', 'finit',
+  'silence', 'voix', 'écho',
+  'lumière', 'ombre',
+  'vide', 'plein', 'rien', 'tout',
+  'seul', 'ensemble', 'séparé',
+  'réel', 'rêvé', 'imaginé', 'pensé',
+  'connu', 'inconnu', 'oublié',
+  'mot', 'sens', 'question', 'réponse',
+  'moi', 'toi', 'nous', 'personne',
+  'lieu', 'temps', 'instant', 'durée',
+  'fragment', 'entier',
+  'dedans', 'dehors',
+  'hier', 'demain', 'aujourd\'hui',
+  'quelque part', 'nulle part', 'partout',
+  'être', 'devenir', 'rester',
+  'savoir', 'ignorer', 'sentir',
+  'je ne sais plus', 'c\'était là', 'ça reviendra',
+  'peut-être', 'certainement', 'jamais vraiment',
+];
+
+const FONTS = [
+  '300 italic', '400', '300',
+];
+
+class Mot {
+  constructor() {
+    this.reset();
+  }
+
+  reset() {
+    this.text = WORDS[Math.floor(Math.random() * WORDS.length)];
+    this.size = 12 + Math.random() * 36;
+    this.fontStyle = FONTS[Math.floor(Math.random() * FONTS.length)];
+
+    // Appear from slightly inside edges
+    const margin = 80;
+    this.x = margin + Math.random() * (W - margin * 2);
+    this.y = margin + Math.random() * (H - margin * 2);
+
+    // Very slow drift
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 0.05 + Math.random() * 0.15;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+
+    this.opacity = 0;
+    this.phase = 'in';
+    this.phaseStart = performance.now();
+
+    this.inDur = 2500 + Math.random() * 3000;
+    this.holdDur = 5000 + Math.random() * 12000;
+    this.outDur = 3000 + Math.random() * 4000;
+
+    // Slight color temperature variation
+    const warmth = Math.random();
+    const r = Math.round(220 + warmth * 15);
+    const g = Math.round(215 + warmth * 8);
+    const b = Math.round(200 + (1 - warmth) * 30);
+    this.color = `${r}, ${g}, ${b}`;
+  }
+
+  update(now) {
+    this.x += this.vx;
+    this.y += this.vy;
+
+    const elapsed = now - this.phaseStart;
+
+    if (this.phase === 'in') {
+      this.opacity = Math.min(1, elapsed / this.inDur);
+      if (elapsed >= this.inDur) {
+        this.phase = 'hold';
+        this.phaseStart = now;
+      }
+    } else if (this.phase === 'hold') {
+      this.opacity = 1;
+      if (elapsed >= this.holdDur) {
+        this.phase = 'out';
+        this.phaseStart = now;
+      }
+    } else if (this.phase === 'out') {
+      this.opacity = Math.max(0, 1 - elapsed / this.outDur);
+      if (elapsed >= this.outDur) {
+        this.phase = 'dead';
+      }
+    }
+  }
+
+  draw(now) {
+    if (this.opacity <= 0) return;
+    const maxAlpha = 0.55 + (this.size - 12) / 36 * 0.25;
+    const alpha = this.opacity * maxAlpha;
+
+    ctx.save();
+    ctx.font = `${this.fontStyle} ${this.size}px 'Cormorant Garamond', Georgia, serif`;
+    ctx.fillStyle = `rgba(${this.color}, ${alpha})`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(this.text, this.x, this.y);
+    ctx.restore();
+  }
+
+  isDead() { return this.phase === 'dead'; }
+}
+
+let mots = [];
+const TARGET = 18;
+
+// Stagger initial spawn
+for (let i = 0; i < TARGET; i++) {
+  const m = new Mot();
+  // Pre-position in different phases so they don't all appear at once
+  m.phaseStart -= Math.random() * (m.inDur + m.holdDur * 0.8);
+  if (m.phaseStart < -(m.inDur)) m.phase = 'hold';
+  mots.push(m);
+}
+
+function tick(now) {
+  // Dark fade (slow trail)
+  ctx.fillStyle = 'rgba(5, 5, 7, 0.06)';
+  ctx.fillRect(0, 0, W, H);
+
+  for (const m of mots) {
+    m.update(now);
+    m.draw(now);
+  }
+
+  // Remove dead, spawn new
+  for (let i = mots.length - 1; i >= 0; i--) {
+    if (mots[i].isDead()) mots.splice(i, 1);
+  }
+  while (mots.length < TARGET) {
+    mots.push(new Mot());
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// Load font then start
+const link = document.createElement('link');
+link.rel = 'stylesheet';
+link.href = 'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&display=swap';
+document.head.appendChild(link);
+
+setTimeout(() => requestAnimationFrame(tick), 300);
+</script>
+</body>
+</html>

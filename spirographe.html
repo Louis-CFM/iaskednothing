@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPIROGRAPHE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&family=Cormorant+Garamond:ital,wght@1,300&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030408; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(160,180,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #ratio {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:1rem; color:rgba(170,185,225,0.22);
+    letter-spacing:0.05em; pointer-events:none;
+    transition:color 1s;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="ratio"></div>
+<div id="label">SPIROGRAPHE · hypotrochoid</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy;
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W / 2; cy = H / 2;
+}
+resize(); addEventListener('resize', () => { resize(); next(); });
+
+// ─── Curve configurations ─────────────────────────────────────────────────────
+
+// Each: { R, r, d } where R=outer, r=inner, d=pen offset
+// All values relative (will be scaled)
+const CONFIGS = [
+  { R: 5, r: 3, d: 3,   name: 'rose δ=1·3',  type: 'hypo' },
+  { R: 7, r: 2, d: 5,   name: 'étoile à 7',  type: 'hypo' },
+  { R: 5, r: 1, d: 3,   name: 'hypocycloïde', type: 'hypo' },
+  { R: 7, r: 3, d: 4,   name: 'trochoid 7:3', type: 'hypo' },
+  { R: 5, r: 2, d: 3.5, name: '5:2 dense',    type: 'hypo' },
+  { R: 8, r: 3, d: 5,   name: 'pétales',      type: 'hypo' },
+  { R: 13, r: 4, d: 8,  name: 'étoile longue',type: 'hypo' },
+  { R: 5, r: 3, d: 5,   name: 'épithrocoïde', type: 'epi'  },
+  { R: 3, r: 2, d: 3,   name: 'cardioïde',    type: 'epi'  },
+];
+
+function gcd(a, b) { return b === 0 ? a : gcd(b, a % b); }
+function lcm(a, b) { return (a * b) / gcd(a, b); }
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let cfgIdx = 0;
+let t      = 0;
+let totalT = 0;
+let tracing = true;
+let path   = [];
+let hue    = 200;
+
+function next() {
+  const cfg = CONFIGS[cfgIdx % CONFIGS.length];
+  cfgIdx++;
+
+  const scale = Math.min(W, H) * 0.42;
+  const Rn = cfg.R / (cfg.R + 1); // normalized
+  const rn = cfg.r / (cfg.R + 1);
+  const dn = cfg.d / (cfg.R + 1);
+
+  // How many full turns until the curve closes?
+  const period = lcm(Math.round(cfg.R), Math.round(cfg.r)) / cfg.r;
+  totalT = period * Math.PI * 2;
+
+  hue = (hue + 45) % 360;
+  t = 0;
+  path = [];
+  tracing = true;
+
+  document.getElementById('ratio').textContent = `R:r = ${cfg.R}:${cfg.r} · ${cfg.name}`;
+
+  // Fade old canvas
+  ctx.fillStyle = 'rgba(3,4,8,0.7)';
+  ctx.fillRect(0, 0, W, H);
+
+  return { cfg, scale, period };
+}
+
+let currentCfg = next();
+
+function point(tt) {
+  const { cfg, scale } = currentCfg;
+  const R = cfg.R, r = cfg.r, d = cfg.d;
+  let x, y;
+
+  if (cfg.type === 'hypo') {
+    x = (R - r) * Math.cos(tt) + d * Math.cos((R - r) / r * tt);
+    y = (R - r) * Math.sin(tt) - d * Math.sin((R - r) / r * tt);
+  } else {
+    // Epitrochoid
+    x = (R + r) * Math.cos(tt) - d * Math.cos((R + r) / r * tt);
+    y = (R + r) * Math.sin(tt) - d * Math.sin((R + r) / r * tt);
+  }
+
+  const maxVal = (cfg.R); // rough normalization
+  return {
+    x: cx + x / maxVal * scale * 0.9,
+    y: cy + y / maxVal * scale * 0.9,
+  };
+}
+
+function mechanismPoint(tt) {
+  const { cfg, scale } = currentCfg;
+  const R = cfg.R, r = cfg.r, d = cfg.d;
+  const maxVal = cfg.R;
+  const sc = scale * 0.9 / maxVal;
+
+  // Center of rolling circle
+  let ox, oy;
+  if (cfg.type === 'hypo') {
+    ox = cx + (R - r) * Math.cos(tt) * sc;
+    oy = cy + (R - r) * Math.sin(tt) * sc;
+  } else {
+    ox = cx + (R + r) * Math.cos(tt) * sc;
+    oy = cy + (R + r) * Math.sin(tt) * sc;
+  }
+
+  // Outer circle radius
+  const outerR = R * sc;
+  // Inner circle radius
+  const innerR = r * sc;
+
+  // Pen point
+  const penAngle = cfg.type === 'hypo'
+    ? (R - r) / r * tt
+    : -(R + r) / r * tt;
+  const px = ox + d * sc * Math.cos(penAngle);
+  const py = oy - d * sc * Math.sin(penAngle);
+
+  return { ox, oy, px, py, outerR, innerR };
+}
+
+// ─── Render loop ──────────────────────────────────────────────────────────────
+
+const DT_PER_FRAME = 0.06;
+let frame = 0;
+let doneAt = -1;
+
+function tick() {
+  // Slow background fade (very slow, to preserve trail)
+  ctx.fillStyle = 'rgba(3,4,8,0.04)';
+  ctx.fillRect(0, 0, W, H);
+
+  if (tracing) {
+    // Advance t
+    const steps = 4;
+    for (let s = 0; s < steps; s++) {
+      t += DT_PER_FRAME / steps;
+      if (t <= totalT) {
+        path.push(point(t));
+      }
+    }
+
+    // Draw accumulated path segment
+    if (path.length > 1) {
+      const start = Math.max(0, path.length - steps - 2);
+      ctx.beginPath();
+      ctx.moveTo(path[start].x, path[start].y);
+      for (let i = start + 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x, path[i].y);
+      }
+      const progress = t / totalT;
+      ctx.strokeStyle = `hsla(${hue + progress * 60}, 65%, 68%, 0.8)`;
+      ctx.lineWidth = 1.3;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+    }
+
+    // Draw mechanism (dim, shows rolling circle)
+    const { ox, oy, px, py, outerR, innerR } = mechanismPoint(t);
+
+    // Outer circle
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(100,110,150,0.12)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Rolling circle
+    ctx.beginPath();
+    ctx.arc(ox, oy, innerR, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(120,130,170,0.18)';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+
+    // Arm (center of rolling circle → pen)
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(px, py);
+    ctx.strokeStyle = `hsla(${hue}, 50%, 60%, 0.25)`;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+
+    // Pen dot
+    ctx.beginPath();
+    ctx.arc(px, py, 3, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue + t / totalT * 60}, 80%, 78%, 0.95)`;
+    ctx.fill();
+
+    if (t >= totalT) {
+      tracing = false;
+      doneAt = frame;
+    }
+  } else if (frame - doneAt > 150) {
+    // Next figure
+    currentCfg = next();
+  }
+
+  frame++;
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+// Click: skip
+canvas.addEventListener('click', () => {
+  tracing = false;
+  doneAt = frame - 100;
+});
+</script>
+</body>
+</html>

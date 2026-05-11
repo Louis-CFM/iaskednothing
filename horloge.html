@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HORLOGE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;500&family=DM+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: #07070a;
+    color: #d4d0c8;
+    font-family: 'DM Mono', monospace;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    width: min(900px, 95vw);
+  }
+
+  .cell {
+    padding: 3rem 3.5rem;
+    border: 1px solid rgba(255,255,255,0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.5s;
+  }
+
+  .cell:hover { border-color: rgba(255,255,255,0.1); }
+
+  .cell-label {
+    font-size: 0.55rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: rgba(180, 170, 150, 0.3);
+  }
+
+  .cell-value {
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 300;
+    letter-spacing: -0.02em;
+    color: rgba(215, 210, 195, 0.9);
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+
+  .cell-sub {
+    font-size: 0.6rem;
+    color: rgba(150, 140, 120, 0.3);
+    margin-top: 0.3rem;
+    line-height: 1.6;
+  }
+
+  /* Progress bars */
+  .bar-wrap {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: rgba(255,255,255,0.03);
+  }
+  .bar-fill {
+    height: 100%;
+    background: rgba(180, 160, 100, 0.4);
+    transition: width 0.5s linear;
+  }
+
+  /* Highlights */
+  .cell.accent .cell-value { color: rgba(180, 160, 100, 0.9); }
+  .cell.dim .cell-value { color: rgba(160, 155, 145, 0.5); }
+
+  @media (max-width: 600px) {
+    #grid { grid-template-columns: 1fr; }
+    .cell { padding: 2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div id="grid">
+
+  <div class="cell accent" id="c-unix">
+    <div class="cell-label">Maintenant</div>
+    <div class="cell-value" id="v-unix">—</div>
+    <div class="cell-sub">secondes depuis le 1er janvier 1970</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-unix" style="width:0%"></div></div>
+  </div>
+
+  <div class="cell" id="c-year">
+    <div class="cell-label">Année écoulée</div>
+    <div class="cell-value" id="v-year">—</div>
+    <div class="cell-sub">de 2026 accompli</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-year" style="width:0%"></div></div>
+  </div>
+
+  <div class="cell" id="c-life">
+    <div class="cell-label">Vie humaine moyenne</div>
+    <div class="cell-value" id="v-life">—</div>
+    <div class="cell-sub">si tu as 30 ans<br>72 ans = durée moyenne</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-life" style="width:0%"></div></div>
+  </div>
+
+  <div class="cell dim" id="c-universe">
+    <div class="cell-label">Âge de l'univers</div>
+    <div class="cell-value" id="v-universe">—</div>
+    <div class="cell-sub">13.8 milliards d'années<br>tu existes depuis ε</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-universe" style="width:100%"></div></div>
+  </div>
+
+  <div class="cell" id="c-day">
+    <div class="cell-label">Jour en cours</div>
+    <div class="cell-value" id="v-day">—</div>
+    <div class="cell-sub">de ce lundi écoulé</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-day" style="width:0%"></div></div>
+  </div>
+
+  <div class="cell accent" id="c-heartbeat">
+    <div class="cell-label">Battements de cœur</div>
+    <div class="cell-value" id="v-heart">—</div>
+    <div class="cell-sub">depuis minuit aujourd'hui<br>~70 bpm</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-heart" style="width:0%"></div></div>
+  </div>
+
+  <div class="cell dim" id="c-light">
+    <div class="cell-label">Lumière parcourue</div>
+    <div class="cell-value" id="v-light">—</div>
+    <div class="cell-sub">km depuis 00:00:00<br>299 792 km/s</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-light" style="width:0%"></div></div>
+  </div>
+
+  <div class="cell" id="c-breath">
+    <div class="cell-label">Respirations aujourd'hui</div>
+    <div class="cell-value" id="v-breath">—</div>
+    <div class="cell-sub">~16 par minute<br>dont tu n'en as remarqué aucune</div>
+    <div class="bar-wrap"><div class="bar-fill" id="b-breath" style="width:0%"></div></div>
+  </div>
+
+</div>
+
+<script>
+function pad(n, l = 2) { return String(Math.floor(n)).padStart(l, '0'); }
+function fmt(n) { return Math.floor(n).toLocaleString('fr-FR'); }
+
+function startOfYear() {
+  const d = new Date();
+  return new Date(d.getFullYear(), 0, 1).getTime();
+}
+
+function startOfDay() {
+  const d = new Date();
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+}
+
+function daysInYear(y) {
+  return ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 366 : 365;
+}
+
+function tick() {
+  const now = Date.now();
+  const nowSec = now / 1000;
+  const d = new Date(now);
+
+  // Unix timestamp
+  document.getElementById('v-unix').textContent = fmt(nowSec);
+  // Slow pulse — just visual interest, no real "bar" for unix
+  const unixPct = ((nowSec % 86400) / 86400) * 100;
+  document.getElementById('b-unix').style.width = unixPct + '%';
+
+  // Year progress
+  const elapsed = now - startOfYear();
+  const yearTotal = daysInYear(d.getFullYear()) * 86400 * 1000;
+  const yearPct = (elapsed / yearTotal) * 100;
+  document.getElementById('v-year').textContent = yearPct.toFixed(5) + ' %';
+  document.getElementById('b-year').style.width = yearPct + '%';
+
+  // Day progress
+  const dayElapsed = (now - startOfDay()) / 1000;
+  const dayPct = (dayElapsed / 86400) * 100;
+  const h = Math.floor(dayElapsed / 3600);
+  const m = Math.floor((dayElapsed % 3600) / 60);
+  const s = Math.floor(dayElapsed % 60);
+  document.getElementById('v-day').textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+  document.getElementById('b-day').style.width = dayPct + '%';
+
+  // Heartbeats since midnight
+  const heartbeats = Math.floor(dayElapsed * 70 / 60);
+  const heartPct = (heartbeats / (86400 * 70 / 60)) * 100;
+  document.getElementById('v-heart').textContent = fmt(heartbeats);
+  document.getElementById('b-heart').style.width = heartPct + '%';
+
+  // Light traveled since midnight
+  const lightKm = dayElapsed * 299792;
+  document.getElementById('v-light').textContent = fmt(lightKm) + ' km';
+  document.getElementById('b-light').style.width = Math.min(100, (lightKm / 2.58e10) * 100) + '%';
+
+  // Breaths today
+  const breaths = Math.floor(dayElapsed * 16 / 60);
+  document.getElementById('v-breath').textContent = fmt(breaths);
+  document.getElementById('b-breath').style.width = (breaths / (86400 * 16 / 60)) * 100 + '%';
+
+  // Life — assume 30 years old
+  const AGE = 30;
+  const LIFE = 72;
+  const lifePct = (AGE / LIFE) * 100;
+  document.getElementById('v-life').textContent = lifePct.toFixed(3) + ' %';
+  document.getElementById('b-life').style.width = lifePct + '%';
+
+  // Universe — epsilon
+  const universeYears = 13.8e9;
+  const pct = (1 / universeYears) * 100;
+  document.getElementById('v-universe').textContent = '0.000000007 %';
+}
+
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>

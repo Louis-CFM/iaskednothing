@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PHYLLOTAXIE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020409; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(140,200,140,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #sub {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    line-height:2; letter-spacing:0.12em;
+    color:rgba(140,200,140,0.18); pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="sub">n: <span id="s-n">0</span> · angle doré: 137.508°</div>
+<div id="label">PHYLLOTAXIE · angle doré</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H, cx, cy;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  cx = W / 2; cy = H / 2;
+}
+resize(); addEventListener('resize', () => { resize(); restart(); });
+
+// ─── Golden angle ─────────────────────────────────────────────────────────────
+// Angle between successive seeds in a sunflower head
+// = 2π × (2 − φ) where φ = (1+√5)/2
+
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5)); // ≈ 2.39996 rad = 137.508°
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+const seeds = [];        // { x, y, n, alpha }
+let n = 0;               // next seed index
+let scale = 0;           // px per sqrt(n)
+let maxN = 0;            // computed max before restart
+let addTimer = 0;        // animation counter (fractional, for smooth addition)
+const SEEDS_PER_FRAME = 0.8; // can be fractional → handled via accumulator
+
+// ─── Color ────────────────────────────────────────────────────────────────────
+
+// Color by Fibonacci family membership:
+// highlight seeds n where n mod fib = 0 for some Fibonacci numbers
+// This reveals the spiral arms naturally
+
+// Or simpler: hue by index modulo to make spiral arms pop
+function seedColor(seedN, total) {
+  const t = seedN / Math.max(total, 1);
+
+  // Inner seeds: warm gold-green; outer: blue-teal; very outer: fades
+  if (t < 0.4) {
+    const s = t / 0.4;
+    const r = Math.round(180 + s * (60 - 180));
+    const g = Math.round(200 + s * (190 - 200));
+    const b = Math.round(80  + s * (180 - 80));
+    return [r, g, b];
+  } else {
+    const s = (t - 0.4) / 0.6;
+    const r = Math.round(60  + s * (40 - 60));
+    const g = Math.round(190 + s * (120 - 190));
+    const b = Math.round(180 + s * (200 - 180));
+    return [r, g, b];
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+
+function restart() {
+  seeds.length = 0;
+  n = 0;
+  addTimer = 0;
+  ctx.fillStyle = '#020409';
+  ctx.fillRect(0, 0, W, H);
+
+  const R = Math.min(W, H) * 0.45;
+  // Max seeds: R² / (scale factor)²
+  // scale ≈ R / sqrt(maxN) → so maxN ≈ (R/scale)²
+  // Typical scale ≈ 6..9 px per unit
+  scale = R / Math.sqrt(1200);
+  maxN = Math.floor((R / scale) ** 2);
+}
+
+restart();
+
+// ─── Render loop ──────────────────────────────────────────────────────────────
+
+let frameN = 0;
+let finishedTimer = -1;
+
+function tick() {
+  // Add new seeds this frame
+  if (n < maxN) {
+    addTimer += SEEDS_PER_FRAME;
+    while (addTimer >= 1 && n < maxN) {
+      addTimer -= 1;
+
+      const r = scale * Math.sqrt(n);
+      const theta = n * GOLDEN_ANGLE;
+      const x = cx + r * Math.cos(theta);
+      const y = cy + r * Math.sin(theta);
+
+      seeds.push({ x, y, n, alpha: 1.0 });
+      n++;
+    }
+  }
+
+  if (n >= maxN && finishedTimer < 0) {
+    finishedTimer = frameN;
+  }
+
+  // Draw new seeds on top (no full redraw — accumulate)
+  // Just draw the most recently added seeds each frame
+  const recentStart = Math.max(0, seeds.length - Math.ceil(SEEDS_PER_FRAME * 2 + 2));
+  for (let i = recentStart; i < seeds.length; i++) {
+    const s = seeds[i];
+    const [r, g, b] = seedColor(s.n, n);
+    const seedR = Math.max(1.0, scale * 0.55);
+
+    // Glow for newest seeds
+    const isNew = i >= seeds.length - 3;
+    if (isNew && seedR > 1.5) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, seedR * 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(${r},${g},${b},0.12)`;
+      ctx.fill();
+    }
+
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, seedR, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(${r},${g},${b},${s.alpha})`;
+    ctx.fill();
+  }
+
+  // UI
+  if (frameN % 15 === 0) {
+    document.getElementById('s-n').textContent = n.toLocaleString('fr-FR');
+  }
+
+  // Restart after a pause when done
+  if (finishedTimer > 0 && frameN - finishedTimer > 200) {
+    finishedTimer = -1;
+    setTimeout(() => restart(), 2000);
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+requestAnimationFrame(tick);
+
+// Click: restart with slight scale variation
+canvas.addEventListener('click', () => {
+  restart();
+  scale *= 0.85 + Math.random() * 0.3;
+  if (scale < 2) scale = 2;
+  const R = Math.min(W, H) * 0.45;
+  maxN = Math.floor((R / scale) ** 2);
+  finishedTimer = -1;
+});
+</script>
+</body>
+</html>

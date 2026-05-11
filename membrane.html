@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MEMBRANE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;700&family=DM+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #060608;
+    --accent: #7c6aff;
+    --accent2: #ff6b6b;
+    --text: #e8e6f0;
+    --muted: #4a4860;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    overflow: hidden;
+    cursor: none;
+  }
+
+  canvas {
+    position: fixed;
+    inset: 0;
+    display: block;
+  }
+
+  #ui {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 3rem;
+  }
+
+  #title {
+    opacity: 0;
+    transform: translateY(-20px);
+    animation: reveal 1.2s cubic-bezier(0.16, 1, 0.3, 1) 0.4s forwards;
+  }
+
+  #title h1 {
+    font-size: clamp(3rem, 8vw, 7rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 0.9;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  #title .sub {
+    margin-top: 0.75rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.75rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  #footer {
+    opacity: 0;
+    animation: reveal 1s cubic-bezier(0.16, 1, 0.3, 1) 1.2s forwards;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+  }
+
+  #stats {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--muted);
+    line-height: 2;
+  }
+
+  #stats span { color: var(--accent); }
+
+  #hint {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.8;
+  }
+
+  #cursor {
+    position: fixed;
+    width: 12px;
+    height: 12px;
+    background: var(--accent);
+    border-radius: 50%;
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s, background 0.3s, width 0.2s, height 0.2s;
+    mix-blend-mode: screen;
+    z-index: 9999;
+  }
+
+  #cursor.click {
+    width: 40px;
+    height: 40px;
+    background: var(--accent2);
+  }
+
+  @keyframes reveal {
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div id="title">
+    <h1>MEMBRANE</h1>
+    <p class="sub">Réseau de pensées vivant</p>
+  </div>
+  <div id="footer">
+    <div id="stats">
+      Nœuds: <span id="s-nodes">0</span><br>
+      Liens: <span id="s-links">0</span><br>
+      Énergie: <span id="s-energy">0</span>%
+    </div>
+    <div id="hint">
+      Déplacer — attirer les nœuds<br>
+      Cliquer — explosion d'énergie<br>
+      Double-clic — nœud fantôme
+    </div>
+  </div>
+</div>
+
+<div id="cursor"></div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const cursor = document.getElementById('cursor');
+const sNodes = document.getElementById('s-nodes');
+const sLinks = document.getElementById('s-links');
+const sEnergy = document.getElementById('s-energy');
+
+let W, H, mouse = { x: -9999, y: -9999, down: false };
+let nodes = [], frame = 0, totalLinks = 0, globalEnergy = 50;
+
+// Config
+const CFG = {
+  count: 80,
+  maxDist: 160,
+  repulse: 80,
+  attract: 200,
+  speed: 0.4,
+  particleR: 2.5,
+  accentH: 260,   // hue for accent (purple-ish)
+  accent2H: 0,    // hue for explosion (red)
+};
+
+class Node {
+  constructor(x, y, ghost = false) {
+    this.x = x ?? Math.random() * W;
+    this.y = y ?? Math.random() * H;
+    this.vx = (Math.random() - 0.5) * CFG.speed;
+    this.vy = (Math.random() - 0.5) * CFG.speed;
+    this.r = CFG.particleR + Math.random() * 1.5;
+    this.energy = Math.random();
+    this.ghost = ghost;
+    this.life = ghost ? 180 : Infinity;
+    this.age = 0;
+    this.pulse = Math.random() * Math.PI * 2;
+  }
+
+  update() {
+    this.pulse += 0.03;
+    this.energy = 0.5 + 0.5 * Math.sin(this.pulse + frame * 0.01);
+
+    // Attract to mouse
+    const dx = mouse.x - this.x;
+    const dy = mouse.y - this.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < CFG.attract && dist > 1) {
+      const force = (CFG.attract - dist) / CFG.attract;
+      this.vx += dx / dist * force * 0.08;
+      this.vy += dy / dist * force * 0.08;
+    }
+    if (dist < CFG.repulse && dist > 1) {
+      this.vx -= dx / dist * 0.3;
+      this.vy -= dy / dist * 0.3;
+    }
+
+    // Friction
+    this.vx *= 0.97;
+    this.vy *= 0.97;
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    // Bounce
+    if (this.x < 0) { this.x = 0; this.vx *= -1; }
+    if (this.x > W) { this.x = W; this.vx *= -1; }
+    if (this.y < 0) { this.y = 0; this.vy *= -1; }
+    if (this.y > H) { this.y = H; this.vy *= -1; }
+
+    this.age++;
+  }
+
+  draw() {
+    const alpha = this.ghost ? Math.max(0, 1 - this.age / this.life) : 1;
+    const hue = this.ghost ? 180 : CFG.accentH + this.energy * 40;
+    const brightness = 55 + this.energy * 30;
+
+    ctx.save();
+    ctx.globalAlpha = alpha * (0.6 + this.energy * 0.4);
+
+    // Glow
+    const grd = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r * 4);
+    grd.addColorStop(0, `hsl(${hue}, 80%, ${brightness}%)`);
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * 4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Core
+    ctx.fillStyle = `hsl(${hue}, 90%, ${brightness + 20}%)`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r * (0.8 + this.energy * 0.4), 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  isDead() { return this.age > this.life; }
+}
+
+function explode(x, y) {
+  for (let i = 0; i < 12; i++) {
+    const angle = (i / 12) * Math.PI * 2;
+    const n = new Node(x, y, true);
+    n.vx = Math.cos(angle) * (2 + Math.random() * 3);
+    n.vy = Math.sin(angle) * (2 + Math.random() * 3);
+    n.r = 3 + Math.random() * 2;
+    n.life = 80 + Math.random() * 60;
+    nodes.push(n);
+  }
+
+  // Shockwave push on nearby
+  for (const n of nodes) {
+    const dx = n.x - x;
+    const dy = n.y - y;
+    const d = Math.sqrt(dx * dx + dy * dy);
+    if (d < 250 && d > 1) {
+      n.vx += dx / d * (250 - d) * 0.05;
+      n.vy += dy / d * (250 - d) * 0.05;
+    }
+  }
+}
+
+function drawConnections() {
+  let links = 0;
+  let energy = 0;
+
+  for (let i = 0; i < nodes.length; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const a = nodes[i], b = nodes[j];
+      const dx = a.x - b.x;
+      const dy = a.y - b.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > CFG.maxDist) continue;
+
+      links++;
+      const strength = 1 - dist / CFG.maxDist;
+      const avgE = (a.energy + b.energy) / 2;
+      const hue = CFG.accentH + avgE * 60;
+      const alpha = strength * 0.4 * (a.ghost || b.ghost ? 0.4 : 1);
+
+      energy += strength;
+
+      // Animated pulse along the line
+      const pct = (frame * 0.02 + i * 0.1) % 1;
+      const px = a.x + (b.x - a.x) * pct;
+      const py = a.y + (b.y - a.y) * pct;
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = `hsl(${hue}, 70%, 60%)`;
+      ctx.lineWidth = strength * 1.5;
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
+
+      // Pulse dot
+      ctx.globalAlpha = alpha * 0.8;
+      ctx.fillStyle = `hsl(${hue + 20}, 90%, 80%)`;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  totalLinks = links;
+  globalEnergy = Math.min(100, Math.round(energy * 2));
+}
+
+function drawBackground() {
+  // Slow vignette pulse
+  const v = 0.02 + 0.005 * Math.sin(frame * 0.005);
+  const grd = ctx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W, H) * 0.8);
+  grd.addColorStop(0, `rgba(12, 8, 30, ${v})`);
+  grd.addColorStop(1, `rgba(6, 6, 8, ${v * 3})`);
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, W, H);
+}
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+
+function init() {
+  resize();
+  nodes = Array.from({ length: CFG.count }, () => new Node());
+}
+
+function tick() {
+  frame++;
+
+  // Fade trail
+  ctx.fillStyle = 'rgba(6, 6, 8, 0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  drawBackground();
+  drawConnections();
+
+  for (const n of nodes) { n.update(); n.draw(); }
+
+  // Remove dead ghosts
+  for (let i = nodes.length - 1; i >= 0; i--) {
+    if (nodes[i].isDead()) nodes.splice(i, 1);
+  }
+
+  // Stats
+  if (frame % 10 === 0) {
+    const mainNodes = nodes.filter(n => !n.ghost).length;
+    sNodes.textContent = mainNodes;
+    sLinks.textContent = totalLinks;
+    sEnergy.textContent = globalEnergy;
+  }
+
+  requestAnimationFrame(tick);
+}
+
+// Events
+window.addEventListener('resize', resize);
+
+window.addEventListener('mousemove', e => {
+  mouse.x = e.clientX;
+  mouse.y = e.clientY;
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+});
+
+window.addEventListener('mousedown', e => {
+  mouse.down = true;
+  cursor.classList.add('click');
+  explode(e.clientX, e.clientY);
+});
+
+window.addEventListener('mouseup', () => {
+  mouse.down = false;
+  cursor.classList.remove('click');
+});
+
+window.addEventListener('dblclick', e => {
+  const n = new Node(e.clientX, e.clientY, true);
+  n.life = 300;
+  n.r = 5;
+  nodes.push(n);
+});
+
+// Touch
+window.addEventListener('touchmove', e => {
+  e.preventDefault();
+  const t = e.touches[0];
+  mouse.x = t.clientX;
+  mouse.y = t.clientY;
+}, { passive: false });
+
+window.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  explode(t.clientX, t.clientY);
+});
+
+init();
+tick();
+</script>
+</body>
+</html>

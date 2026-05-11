@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BABEL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300;0,500&family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#030207; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(200,180,140,0.08);
+    text-transform:uppercase; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="label">BABEL · le même sous le différent</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ─── Concept data ─────────────────────────────────────────────────────────────
+
+const CONCEPTS = [
+  {
+    fr: 'eau',
+    translations: [
+      'water','agua','Wasser','acqua','água','вода','ماء','水','水','물',
+      'पानी','su','νερό','vatten','maji','nước','air','woda','vesi','uisce',
+      'ūdens','vanduo','víz','voda','ūdens',
+    ]
+  },
+  {
+    fr: 'lumière',
+    translations: [
+      'light','luz','Licht','luce','luz','свет','ضوء','光','光','빛',
+      'प्रकाश','ışık','φως','ljus','mwanga','ánh sáng','cahaya','światło','valo','solas',
+      'gaisma','šviesa','fény','svjetlost','gaisma',
+    ]
+  },
+  {
+    fr: 'temps',
+    translations: [
+      'time','tiempo','Zeit','tempo','tempo','время','وقت','时间','時間','시간',
+      'समय','zaman','χρόνος','tid','wakati','thời gian','waktu','czas','aika','am',
+      'laiks','laikas','idő','vrijeme','laiks',
+    ]
+  },
+  {
+    fr: 'silence',
+    translations: [
+      'silence','silencio','Stille','silenzio','silêncio','тишина','صمت','沉默','沈黙','침묵',
+      'मौन','sessizlik','σιωπή','tystnad','ukimya','im lặng','keheningan','cisza','hiljaisuus','ciúnas',
+      'klusums','tyla','csend','tišina','klusums',
+    ]
+  },
+  {
+    fr: 'maison',
+    translations: [
+      'home','casa','Haus','casa','casa','дом','بيت','家','家','집',
+      'घर','ev','σπίτι','hem','nyumba','nhà','rumah','dom','koti','teach',
+      'māja','namai','ház','dom','māja',
+    ]
+  },
+  {
+    fr: 'nuit',
+    translations: [
+      'night','noche','Nacht','notte','noite','ночь','ليل','夜','夜','밤',
+      'रात','gece','νύχτα','natt','usiku','ban đêm','malam','noc','yö','oíche',
+      'nakts','naktis','éj','noć','nakts',
+    ]
+  },
+  {
+    fr: 'mémoire',
+    translations: [
+      'memory','memoria','Erinnerung','memoria','memória','память','ذاكرة','记忆','記憶','기억',
+      'स्मृति','hafıza','μνήμη','minne','kumbukumbu','ký ức','kenangan','pamięć','muisti','cuimhne',
+      'atmiņa','atmintis','emlékezet','sjećanje','atmiņa',
+    ]
+  },
+  {
+    fr: 'seuil',
+    translations: [
+      'threshold','umbral','Schwelle','soglia','limiar','порог','عتبة','门槛','敷居','문턱',
+      'दहलीज','eşik','κατώφλι','tröskel','kizingiti','ngưỡng cửa','ambang','próg','kynnys','tairseach',
+      'slieksnis','slenkstis','küszöb','prag','slieksnis',
+    ]
+  },
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+let conceptIdx = 0;
+let phase      = 'in';  // 'in' | 'hold' | 'out'
+let phaseT     = 0;
+let words      = [];    // positioned translations for current concept
+
+const PHASE_IN   = 80;
+const PHASE_HOLD = 160;
+const PHASE_OUT  = 80;
+
+// Random seeded position for each translation word
+function placeWords(concept) {
+  const cx = W / 2, cy = H / 2;
+  const ring1 = Math.min(W, H) * 0.22;
+  const ring2 = Math.min(W, H) * 0.40;
+
+  const result = [];
+  const translations = concept.translations;
+  const count = Math.min(translations.length, 22);
+
+  for (let i = 0; i < count; i++) {
+    // Distribute on ellipses
+    const fraction = i / count;
+    const r = ring1 + (ring2 - ring1) * Math.pow((i % 3) / 2, 0.7);
+    const angle = fraction * Math.PI * 2 + (i * 0.8);
+
+    // Add slight randomness
+    const jitterR = r + (Math.random() - 0.5) * 60;
+    const jitterA = angle + (Math.random() - 0.5) * 0.4;
+
+    const x = cx + jitterR * Math.cos(jitterA);
+    const y = cy + jitterR * Math.sin(jitterA);
+
+    // Font size inversely proportional to number of words
+    const size = 10 + Math.random() * 10;
+    const baseAlpha = 0.25 + Math.random() * 0.35;
+
+    result.push({ word: translations[i], x, y, size, baseAlpha });
+  }
+  return result;
+}
+
+function nextConcept() {
+  const concept = CONCEPTS[conceptIdx % CONCEPTS.length];
+  words = placeWords(concept);
+  phase = 'in';
+  phaseT = 0;
+  conceptIdx++;
+}
+
+nextConcept();
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+
+let frameN = 0;
+
+function easeInOut(t) { return t < 0.5 ? 2*t*t : -1+(4-2*t)*t; }
+
+function tick() {
+  ctx.fillStyle = 'rgba(3,2,7,0.25)';
+  ctx.fillRect(0, 0, W, H);
+
+  // Compute global alpha for this phase
+  let globalAlpha;
+  if (phase === 'in') {
+    globalAlpha = easeInOut(phaseT / PHASE_IN);
+  } else if (phase === 'hold') {
+    globalAlpha = 1;
+  } else {
+    globalAlpha = easeInOut(1 - phaseT / PHASE_OUT);
+  }
+
+  const concept = CONCEPTS[(conceptIdx - 1 + CONCEPTS.length) % CONCEPTS.length];
+
+  // Draw central concept word (large, French)
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Breathing scale for central word
+  const breathe = 1 + 0.015 * Math.sin(frameN * 0.025);
+  const centralSize = Math.min(W, H) * 0.11 * breathe;
+  ctx.font = `300 ${centralSize}px 'Cormorant Garamond', serif`;
+  ctx.fillStyle = `rgba(225, 215, 195, ${globalAlpha * 0.75})`;
+  ctx.fillText(concept.fr, W / 2, H / 2);
+  ctx.restore();
+
+  // Draw outer hint: "le même"
+  if (globalAlpha > 0.4) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `italic 300 ${Math.min(W,H)*0.013}px 'Cormorant Garamond', serif`;
+    ctx.fillStyle = `rgba(180, 165, 140, ${(globalAlpha - 0.4) * 0.15})`;
+    ctx.fillText('le même · the same · lo mismo · das Gleiche · 同じ · одно и то же', W / 2, H / 2 + Math.min(W,H) * 0.09);
+    ctx.restore();
+  }
+
+  // Draw translation words
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  for (let i = 0; i < words.length; i++) {
+    const w = words[i];
+    // Stagger entrance: words appear one by one
+    let wordAlpha = globalAlpha;
+    if (phase === 'in') {
+      const delay = i / words.length * 0.6;
+      const localT = Math.max(0, (phaseT / PHASE_IN) - delay) / 0.4;
+      wordAlpha = Math.min(1, localT) * w.baseAlpha * globalAlpha;
+    } else {
+      wordAlpha = w.baseAlpha * globalAlpha;
+    }
+
+    // Slow drift
+    const drift = Math.sin(frameN * 0.008 + i * 1.7) * 3;
+    const yDrift = Math.cos(frameN * 0.011 + i * 0.9) * 2;
+
+    ctx.font = `300 ${w.size}px 'Cormorant Garamond', serif`;
+    ctx.fillStyle = `rgba(200, 188, 165, ${wordAlpha})`;
+    ctx.fillText(w.word, w.x + drift, w.y + yDrift);
+  }
+  ctx.restore();
+
+  // Advance phase
+  phaseT++;
+  if (phase === 'in' && phaseT >= PHASE_IN) {
+    phase = 'hold';
+    phaseT = 0;
+  } else if (phase === 'hold' && phaseT >= PHASE_HOLD) {
+    phase = 'out';
+    phaseT = 0;
+  } else if (phase === 'out' && phaseT >= PHASE_OUT) {
+    ctx.fillStyle = 'rgba(3,2,7,0.95)';
+    ctx.fillRect(0, 0, W, H);
+    nextConcept();
+  }
+
+  frameN++;
+  requestAnimationFrame(tick);
+}
+
+// Clear & restart on click
+canvas.addEventListener('click', () => {
+  ctx.fillStyle = 'rgba(3,2,7,0.95)';
+  ctx.fillRect(0, 0, W, H);
+  nextConcept();
+});
+
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>

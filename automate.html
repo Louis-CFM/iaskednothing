@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AUTOMATE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono&display=swap');
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#020208; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(160,150,200,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #hud {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    line-height:2.2; letter-spacing:0.15em;
+    color:rgba(160,150,200,0.2); pointer-events:none;
+  }
+  #hud span { color:rgba(220,200,150,0.35); }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">règle: <span id="s-rule">—</span><br>génération: <span id="s-gen">0</span></div>
+<div id="label">AUTOMATE · élémentaire</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+}
+resize(); addEventListener('resize', () => { resize(); restart(); });
+
+// ─── Automaton rules ──────────────────────────────────────────────────────────
+
+const RULES = [
+  {
+    n: 90,
+    name: 'sierpinski',
+    // R=90 → XOR of left and right neighbor → Sierpinski triangle
+    on:  [50,  220, 190],  // teal
+    off: [5, 8, 14],
+    desc: 'triangle de Sierpiński',
+  },
+  {
+    n: 30,
+    name: 'chaos',
+    // R=30 → pseudo-random, used in Mathematica's Random[]
+    on:  [220, 160, 60],   // amber
+    off: [6, 5, 4],
+    desc: 'générateur de hasard',
+  },
+  {
+    n: 110,
+    name: 'universel',
+    // R=110 → Turing-complete
+    on:  [160, 120, 240],  // violet
+    off: [5, 4, 10],
+    desc: 'Turing-complet',
+  },
+  {
+    n: 184,
+    name: 'trafic',
+    // R=184 → traffic flow model
+    on:  [240, 120, 110],  // coral
+    off: [7, 5, 5],
+    desc: 'modèle de trafic',
+  },
+  {
+    n: 60,
+    name: 'variation',
+    on:  [80,  180, 230],  // sky blue
+    off: [4, 6, 9],
+    desc: 'variante Sierpiński',
+  },
+  {
+    n: 22,
+    name: 'dendritic',
+    on:  [140, 220, 140],  // green
+    off: [4, 6, 4],
+    desc: 'dendritique',
+  },
+];
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+const CELL  = 3;
+let ruleIdx = 0;
+let row;
+let rowY    = 0;
+let gen     = 0;
+let imgData, pix;
+
+function computeNext(rule, r) {
+  const n = r.length;
+  const next = new Uint8Array(n);
+  for (let i = 0; i < n; i++) {
+    const l = r[(i - 1 + n) % n];
+    const c = r[i];
+    const ri = r[(i + 1) % n];
+    const idx = (l << 2) | (c << 1) | ri;
+    next[i] = (rule >> idx) & 1;
+  }
+  return next;
+}
+
+function restart() {
+  ctx.fillStyle = '#020208';
+  ctx.fillRect(0, 0, W, H);
+
+  imgData = ctx.createImageData(W, H);
+  pix = imgData.data;
+  for (let i = 3; i < pix.length; i += 4) pix[i] = 255;
+
+  const cols = Math.ceil(W / CELL);
+  row = new Uint8Array(cols);
+  row[Math.floor(cols / 2)] = 1; // single seed in center
+
+  rowY = 0;
+  gen  = 0;
+
+  const r = RULES[ruleIdx];
+  document.getElementById('s-rule').textContent = `${r.n} · ${r.desc}`;
+  document.getElementById('s-gen').textContent  = '0';
+}
+
+// ─── Drawing ──────────────────────────────────────────────────────────────────
+
+const ROWS_PER_FRAME = 3;
+
+function drawRow(r, y, rule) {
+  const [or, og, ob] = rule.on;
+  const [dr, dg, db] = rule.off;
+
+  for (let col = 0; col < r.length; col++) {
+    const x0 = col * CELL;
+    const on = r[col] === 1;
+
+    // Slight hue variation across the row
+    const hv = Math.sin(col * 0.07 + rowY * 0.03) * 20;
+
+    const cr = on ? Math.min(255, or + hv) : dr;
+    const cg = on ? Math.min(255, og + hv * 0.3) : dg;
+    const cb = on ? Math.min(255, ob - hv * 0.5) : db;
+
+    const alpha = on ? 1.0 : (0.5 + 0.5 * ((col + y) % 2 === 0 ? 0 : 0));
+
+    for (let dx = 0; dx < CELL && x0 + dx < W; dx++) {
+      for (let dy = 0; dy < CELL && y + dy < H; dy++) {
+        const pi = ((y + dy) * W + x0 + dx) * 4;
+        if (on) {
+          pix[pi]   = cr;
+          pix[pi+1] = cg;
+          pix[pi+2] = cb;
+        } else {
+          pix[pi]   = dr;
+          pix[pi+1] = dg;
+          pix[pi+2] = db;
+        }
+      }
+    }
+  }
+}
+
+// ─── Main loop ────────────────────────────────────────────────────────────────
+
+let paused = false;
+
+function tick() {
+  if (paused) {
+    requestAnimationFrame(tick);
+    return;
+  }
+
+  const rule = RULES[ruleIdx];
+
+  for (let i = 0; i < ROWS_PER_FRAME; i++) {
+    if (rowY + CELL <= H) {
+      drawRow(row, rowY, rule);
+      row = computeNext(rule.n, row);
+      rowY += CELL;
+      gen++;
+    } else {
+      // Finished — pause then switch rule
+      ctx.putImageData(imgData, 0, 0);
+
+      // Draw a faint overlay to give a sense of a new "page"
+      paused = true;
+      setTimeout(() => {
+        ruleIdx = (ruleIdx + 1) % RULES.length;
+        restart();
+        paused = false;
+      }, 3500);
+      return;
+    }
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+
+  if (gen % 30 === 0) {
+    document.getElementById('s-gen').textContent = gen.toLocaleString('fr-FR');
+  }
+
+  requestAnimationFrame(tick);
+}
+
+restart();
+requestAnimationFrame(tick);
+
+// Click: next rule immediately
+canvas.addEventListener('click', () => {
+  paused = false;
+  ruleIdx = (ruleIdx + 1) % RULES.length;
+  restart();
+});
+</script>
+</body>
+</html>

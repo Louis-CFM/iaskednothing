@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HARMONIE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;1,300&family=DM+Mono&display=swap');
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; background:#04040a; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #start {
+    position:fixed; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; gap:1.2rem;
+    cursor:pointer; z-index:10; transition:opacity 1.5s;
+  }
+  #start.gone { opacity:0; pointer-events:none; }
+  #pulse { width:8px; height:8px; border-radius:50%;
+    background:rgba(160,140,200,0.6);
+    animation:p 2s ease-in-out infinite; }
+  @keyframes p { 0%,100%{transform:scale(1);opacity:.4} 50%{transform:scale(1.8);opacity:1} }
+  #start p { font-family:'DM Mono',monospace; font-size:0.6rem;
+    letter-spacing:0.25em; color:rgba(160,145,190,0.35); text-transform:uppercase; }
+  #chord-name {
+    position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+    font-family:'Cormorant Garamond',serif; font-style:italic;
+    font-size:clamp(3rem,10vw,6rem); font-weight:300;
+    color:rgba(220,210,195,0.08); letter-spacing:-0.02em;
+    pointer-events:none; transition:opacity 1.5s, color 1.5s;
+    z-index:2;
+  }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:'DM Mono',monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(160,140,200,0.1);
+    text-transform:uppercase; pointer-events:none; z-index:2;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="start">
+  <div id="pulse"></div>
+  <p>toucher pour entendre</p>
+</div>
+<div id="chord-name"></div>
+<div id="label">HARMONIE</div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = innerWidth; H = canvas.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+// ─── Music theory ─────────────────────────────────────────────────────────────
+
+// Equal temperament: freq = 440 * 2^((midi-69)/12)
+function midiToHz(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+
+// Jazz chord progressions (MIDI note numbers, middle octave)
+// Am7 → Dm7 → G7 → Cmaj7 → Fmaj7 → Bm7b5 → E7 → Am7
+const PROGRESSION = [
+  { name: 'Am⁷',    notes: [57,60,64,67] },  // A C E G
+  { name: 'Dm⁷',    notes: [62,65,69,72] },  // D F A C
+  { name: 'G⁷',     notes: [55,59,62,65] },  // G B D F
+  { name: 'Cmaj⁷',  notes: [60,64,67,71] },  // C E G B
+  { name: 'Fmaj⁷',  notes: [65,69,72,76] },  // F A C E
+  { name: 'Bm⁷♭⁵',  notes: [59,62,65,69] },  // B D F A
+  { name: 'E⁷',     notes: [64,68,71,74] },  // E G# B D
+];
+
+// Pentatonic melody pool (Am pentatonic)
+const MELODY_POOL = [57,60,62,64,67, 69,72,74,76,79, 81,84,48,50,53,55];
+
+const CHORD_DUR = 6.0; // seconds per chord
+
+let audioCtx = null, started = false;
+const chordEl = document.getElementById('chord-name');
+
+function makeReverb(ac) {
+  const conv = ac.createConvolver();
+  const rate = ac.sampleRate;
+  const len = rate * 5;
+  const buf = ac.createBuffer(2, len, rate);
+  for (let c = 0; c < 2; c++) {
+    const ch = buf.getChannelData(c);
+    for (let i = 0; i < len; i++) ch[i] = (Math.random()*2-1) * Math.pow(1-i/len, 1.8);
+  }
+  conv.buffer = buf;
+  return conv;
+}
+
+function startMusic() {
+  if (started) return;
+  started = true;
+  document.getElementById('start').classList.add('gone');
+
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const master = audioCtx.createGain();
+  master.gain.setValueAtTime(0, audioCtx.currentTime);
+  master.gain.linearRampToValueAtTime(0.6, audioCtx.currentTime + 3);
+  master.connect(audioCtx.destination);
+
+  const reverb = makeReverb(audioCtx);
+  reverb.connect(master);
+
+  const dry = audioCtx.createGain();
+  dry.gain.value = 0.3;
+  dry.connect(master);
+
+  const wet = audioCtx.createGain();
+  wet.gain.value = 0.5;
+  wet.connect(reverb);
+
+  // ── Drone bass ───────────────────────────────────────────────────────────────
+  const drone = audioCtx.createOscillator();
+  drone.type = 'sine';
+  drone.frequency.value = midiToHz(33); // A1
+  const droneG = audioCtx.createGain();
+  droneG.gain.value = 0.04;
+  drone.connect(droneG);
+  droneG.connect(wet);
+  drone.start();
+
+  // ── Chord voices (4 oscillators, voice-led) ───────────────────────────────────
+  const voices = Array.from({length: 4}, () => {
+    const osc = audioCtx.createOscillator();
+    osc.type = 'triangle';
+    const g = audioCtx.createGain();
+    g.gain.value = 0;
+    osc.connect(g);
+    g.connect(wet);
+    g.connect(dry);
+    osc.start();
+    return { osc, gain: g, midi: null };
+  });
+
+  // ── Melody voice ───────────────────────────────────────────────────────────
+  const melOsc = audioCtx.createOscillator();
+  melOsc.type = 'sine';
+  const melG = audioCtx.createGain();
+  melG.gain.value = 0;
+  melOsc.connect(melG);
+  melG.connect(wet);
+  melG.connect(dry);
+  melOsc.start();
+
+  // ── LFO for subtle chorus on chords ──────────────────────────────────────────
+  // (achieved by slightly detuning voice 2)
+
+  let chordIdx = 0;
+  let t = audioCtx.currentTime + 0.5;
+
+  function scheduleChord(idx, startT) {
+    const chord = PROGRESSION[idx];
+    const endT = startT + CHORD_DUR;
+
+    // Voice lead: each voice glides to nearest chord tone
+    chord.notes.forEach((target, i) => {
+      const prev = voices[i].midi || target;
+      const freq = midiToHz(target);
+      const prevFreq = midiToHz(prev);
+      voices[i].osc.frequency.setValueAtTime(prevFreq, startT);
+      voices[i].osc.frequency.linearRampToValueAtTime(freq, startT + 0.4);
+      voices[i].gain.gain.setValueAtTime(0.045 - i*0.005, startT);
+      voices[i].gain.gain.setTargetAtTime(0, endT - 0.5, 0.3);
+      voices[i].midi = target;
+    });
+
+    // Update UI
+    const uiDelay = Math.max(0, (startT - audioCtx.currentTime) * 1000);
+    setTimeout(() => {
+      chordEl.textContent = chord.name;
+      chordEl.style.color = 'rgba(220,210,195,0.12)';
+    }, uiDelay);
+
+    return endT;
+  }
+
+  function scheduleMelodyNote(startT, chordNotes) {
+    // Pick melodic note from pentatonic, prefer chord tones
+    const isChordTone = n => chordNotes.some(c => (c % 12) === (n % 12));
+    const candidates = MELODY_POOL.filter(n => Math.random() < (isChordTone(n) ? 0.55 : 0.3));
+    if (!candidates.length) return startT + 1;
+
+    const note = candidates[(Math.random() * candidates.length)|0];
+    const dur = 0.4 + Math.random() * 1.8;
+
+    melOsc.frequency.setValueAtTime(midiToHz(note), startT);
+    melG.gain.setValueAtTime(0, startT);
+    melG.gain.linearRampToValueAtTime(0.06, startT + 0.08);
+    melG.gain.setTargetAtTime(0, startT + dur * 0.7, 0.2);
+
+    return startT + dur + 0.1 + Math.random() * 0.5;
+  }
+
+  // Schedule initial chords
+  function scheduleNext() {
+    // Schedule 2 chords ahead
+    t = scheduleChord(chordIdx, t);
+    chordIdx = (chordIdx + 1) % PROGRESSION.length;
+
+    // Melody notes within chord duration
+    let mt = t - CHORD_DUR + 0.3;
+    const chord = PROGRESSION[(chordIdx - 1 + PROGRESSION.length) % PROGRESSION.length];
+    for (let i = 0; i < 5; i++) {
+      mt = scheduleMelodyNote(mt, chord.notes);
+      if (mt > t - 0.5) break;
+    }
+
+    // Check again before chord ends
+    const msUntilEnd = (t - CHORD_DUR * 0.3 - audioCtx.currentTime) * 1000;
+    setTimeout(scheduleNext, Math.max(100, msUntilEnd));
+  }
+
+  scheduleNext();
+  scheduleChord(chordIdx, t - CHORD_DUR + 0.3); // pre-schedule first
+}
+
+document.addEventListener('click', startMusic);
+document.addEventListener('touchstart', startMusic, {passive:true});
+
+// ─── Visualization ─────────────────────────────────────────────────────────────
+
+let analyser = null, analyserData = null;
+let hue = 240, frame = 0;
+
+function getAnalyser() {
+  if (!audioCtx || analyser) return;
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 2048;
+  analyser.smoothingTimeConstant = 0.9;
+  audioCtx.destination; // can't easily tap, just use a separate analyser on master...
+  // Actually, re-route: but too late. Use a simpler animation.
+  analyserData = new Uint8Array(analyser.fftSize);
+}
+
+function drawViz() {
+  frame++;
+  ctx.fillStyle = 'rgba(4,4,10,0.18)';
+  ctx.fillRect(0, 0, W, H);
+
+  const cx = W/2, cy = H/2;
+  const R = Math.min(W,H) * 0.28;
+
+  hue += 0.02;
+
+  // Breathing ring
+  const breathe = 1 + 0.04 * Math.sin(frame * 0.008);
+  const r = R * breathe;
+
+  // Draw multiple concentric arcs with slight offsets
+  for (let i = 0; i < 3; i++) {
+    const ri = r * (0.85 + i * 0.1);
+    const alpha = (0.04 - i * 0.012);
+    ctx.beginPath();
+    ctx.arc(cx, cy, ri, 0, Math.PI * 2);
+    ctx.strokeStyle = `hsla(${hue + i*15}, 50%, 60%, ${alpha})`;
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+  }
+
+  // Floating luminous points along the ring
+  for (let i = 0; i < 32; i++) {
+    const angle = (frame * 0.003 + i / 32 * Math.PI * 2);
+    const pulse = 0.5 + 0.5 * Math.sin(frame * 0.02 + i * 0.8);
+    const pr = r + Math.sin(frame * 0.015 + i * 1.3) * 20;
+    const px = cx + Math.cos(angle) * pr;
+    const py = cy + Math.sin(angle) * pr;
+    const size = 1 + pulse * 2;
+    ctx.beginPath();
+    ctx.arc(px, py, size, 0, Math.PI * 2);
+    ctx.fillStyle = `hsla(${hue + i*4}, 60%, 70%, ${pulse * 0.25})`;
+    ctx.fill();
+  }
+
+  // Inner wave
+  ctx.beginPath();
+  const pts = 256;
+  for (let i = 0; i <= pts; i++) {
+    const angle = (i / pts) * Math.PI * 2;
+    const wave = Math.sin(angle * 4 + frame * 0.04) * 12
+               + Math.sin(angle * 7 - frame * 0.025) * 6
+               + Math.sin(angle * 11 + frame * 0.018) * 3;
+    const pr = R * 0.55 + wave;
+    const px = cx + Math.cos(angle) * pr;
+    const py = cy + Math.sin(angle) * pr;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = `hsla(${hue+30}, 55%, 65%, 0.12)`;
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  requestAnimationFrame(drawViz);
+}
+
+requestAnimationFrame(drawViz);
+</script>
+</body>
+</html>

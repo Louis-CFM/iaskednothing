@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOUFFLE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400&family=DM+Mono&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #08080a;
+    overflow: hidden;
+    font-family: 'Cormorant Garamond', serif;
+    color: #ddd8cc;
+  }
+
+  #scene {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3.5rem;
+  }
+
+  #ring-wrap {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #ring {
+    position: absolute;
+    border-radius: 50%;
+    will-change: transform, opacity;
+  }
+
+  #outer {
+    width: 300px; height: 300px;
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 50%;
+    position: absolute;
+  }
+
+  #core {
+    width: 100px; height: 100px;
+    background: radial-gradient(circle, #e8ddc8, #c4a97a);
+    border-radius: 50%;
+    transition: transform 0.1s linear, box-shadow 0.5s ease;
+    box-shadow: 0 0 60px rgba(200, 170, 100, 0.2);
+  }
+
+  #halo {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    border: 1px solid rgba(200, 170, 100, 0.3);
+    position: absolute;
+    transition: transform 0.1s linear, opacity 0.5s ease;
+  }
+
+  #halo2 {
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    border: 1px solid rgba(200, 170, 100, 0.12);
+    position: absolute;
+    transition: transform 0.1s linear, opacity 0.5s ease;
+  }
+
+  #label {
+    text-align: center;
+    letter-spacing: 0.35em;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    color: rgba(220, 210, 190, 0.5);
+    font-weight: 300;
+    height: 1.5em;
+    transition: color 1s ease;
+    font-family: 'DM Mono', monospace;
+  }
+
+  #phrase {
+    font-size: 2.2rem;
+    font-weight: 300;
+    letter-spacing: 0.02em;
+    text-align: center;
+    color: rgba(235, 225, 205, 0.85);
+    height: 3rem;
+    transition: opacity 0.8s ease;
+    font-style: italic;
+  }
+
+  #meta {
+    position: fixed;
+    bottom: 2.5rem;
+    right: 2.5rem;
+    font-family: 'DM Mono', monospace;
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.15);
+    text-align: right;
+    line-height: 2;
+  }
+
+  #meta span { color: rgba(200,170,100,0.4); }
+
+  /* Grain */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    opacity: 0.025;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+
+<div id="scene">
+  <div id="phrase">respire</div>
+  <div id="ring-wrap">
+    <div id="outer"></div>
+    <div id="halo2" class="ring"></div>
+    <div id="halo" class="ring"></div>
+    <div id="core" class="ring"></div>
+  </div>
+  <div id="label">—</div>
+</div>
+
+<div id="meta">
+  Cycle <span id="cycle-n">1</span><br>
+  <span id="timer">0:00</span>
+</div>
+
+<script>
+const core = document.getElementById('core');
+const halo = document.getElementById('halo');
+const halo2 = document.getElementById('halo2');
+const label = document.getElementById('label');
+const phrase = document.getElementById('phrase');
+const cycleN = document.getElementById('cycle-n');
+const timerEl = document.getElementById('timer');
+
+// 4-4-6 breathing (box lite: in, hold, out)
+const PHASES = [
+  { name: 'inspire',  duration: 4000, scale: 2.8,  haloScale: 3.4, h2Scale: 4.0 },
+  { name: 'retiens',  duration: 4000, scale: 2.8,  haloScale: 3.4, h2Scale: 4.0 },
+  { name: 'expire',   duration: 6000, scale: 1.0,  haloScale: 1.0, h2Scale: 1.0 },
+];
+
+const PHRASES = [
+  'respire',
+  'tu es là',
+  'laisse aller',
+  'présent',
+  'doucement',
+  'ici',
+];
+
+let phaseIdx = 0;
+let cycleCount = 1;
+let startTime = Date.now();
+let phraseIdx = 0;
+let animStart = null;
+let fromScale = 1, toScale = PHASES[0].scale;
+let fromHalo = 1, toHalo = PHASES[0].haloScale;
+let fromH2 = 1, toH2 = PHASES[0].h2Scale;
+let currentScale = 1, currentHalo = 1, currentH2 = 1;
+
+function easeInOut(t) {
+  return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+}
+
+function nextPhase() {
+  fromScale = currentScale;
+  fromHalo = currentHalo;
+  fromH2 = currentH2;
+
+  phaseIdx = (phaseIdx + 1) % PHASES.length;
+
+  if (phaseIdx === 0) {
+    cycleCount++;
+    cycleN.textContent = cycleCount;
+    phraseIdx = (phraseIdx + 1) % PHRASES.length;
+    phrase.style.opacity = '0';
+    setTimeout(() => {
+      phrase.textContent = PHRASES[phraseIdx];
+      phrase.style.opacity = '1';
+    }, 500);
+  }
+
+  const p = PHASES[phaseIdx];
+  toScale = p.scale;
+  toHalo = p.haloScale;
+  toH2 = p.h2Scale;
+  label.textContent = p.name;
+  animStart = null;
+}
+
+function animate(ts) {
+  if (!animStart) animStart = ts;
+  const p = PHASES[phaseIdx];
+  const elapsed = ts - animStart;
+  const t = Math.min(elapsed / p.duration, 1);
+  const e = easeInOut(t);
+
+  currentScale = fromScale + (toScale - fromScale) * e;
+  currentHalo = fromHalo + (toHalo - fromHalo) * e;
+  currentH2 = fromH2 + (toH2 - fromH2) * e;
+
+  core.style.transform = `scale(${currentScale})`;
+  halo.style.transform = `scale(${currentHalo})`;
+  halo2.style.transform = `scale(${currentH2})`;
+
+  // Glow intensity
+  const glow = 20 + (currentScale - 1) / (2.8 - 1) * 80;
+  core.style.boxShadow = `0 0 ${glow}px rgba(200,170,100,${0.15 + (currentScale-1)*0.1})`;
+
+  // Timer
+  const elapsed2 = Math.floor((Date.now() - startTime) / 1000);
+  const m = Math.floor(elapsed2 / 60);
+  const s = elapsed2 % 60;
+  timerEl.textContent = `${m}:${s.toString().padStart(2,'0')}`;
+
+  if (t >= 1) nextPhase();
+
+  requestAnimationFrame(animate);
+}
+
+// Init
+label.textContent = PHASES[0].name;
+phrase.textContent = PHRASES[0];
+animStart = null;
+fromScale = 1; toScale = PHASES[0].scale;
+fromHalo = 1; toHalo = PHASES[0].haloScale;
+fromH2 = 1; toH2 = PHASES[0].h2Scale;
+
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

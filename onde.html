@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ONDE</title>
+<style>
+  * { margin:0; padding:0; }
+  html, body { width:100%; height:100%; background:#01010a; overflow:hidden; }
+  canvas { position:fixed; inset:0; display:block; }
+  #label {
+    position:fixed; bottom:2rem; right:2rem;
+    font-family:monospace; font-size:0.55rem;
+    letter-spacing:0.3em; color:rgba(140,180,220,0.1);
+    text-transform:uppercase; pointer-events:none;
+  }
+  #sub {
+    position:fixed; bottom:2rem; left:2rem;
+    font-family:monospace; font-size:0.55rem; line-height:2;
+    letter-spacing:0.12em; color:rgba(140,175,215,0.18);
+    pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="sub">sources: <span id="s-n">5</span> · clic — ajouter · double-clic — réinitialiser</div>
+<div id="label">ONDE · interférence</div>
+
+<script>
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+if (!gl) { document.body.textContent = 'WebGL requis'; throw 0; }
+
+// ─── Shaders ──────────────────────────────────────────────────────────────────
+
+const VS = `
+attribute vec2 a_pos;
+void main() { gl_Position = vec4(a_pos, 0.0, 1.0); }
+`;
+
+const FS = `
+precision highp float;
+
+uniform vec2  u_res;
+uniform float u_time;
+uniform int   u_n;
+uniform vec2  u_sources[16];
+uniform float u_freqs[16];
+uniform float u_phases[16];
+
+#define TAU 6.283185307
+
+void main() {
+  vec2 uv = gl_FragCoord.xy / u_res;
+  vec2 p  = (uv - 0.5) * 2.0;
+  p.x *= u_res.x / u_res.y; // aspect correct
+
+  float sum = 0.0;
+  float maxAmp = float(u_n);
+
+  for (int i = 0; i < 16; i++) {
+    if (i >= u_n) break;
+    vec2  src  = u_sources[i];
+    float freq = u_freqs[i];
+    float ph   = u_phases[i];
+
+    float dist = length(p - src);
+    sum += sin(dist * freq * TAU - u_time * 1.6 + ph);
+  }
+
+  // Normalize to [-1, 1]
+  float v = sum / maxAmp;
+
+  // Interference palette
+  // Constructive: warm (amber/gold)
+  // Destructive:  deep indigo/void
+  // Zero crossing: teal
+
+  float t = v * 0.5 + 0.5; // [0, 1]
+
+  vec3 col;
+  if (t < 0.33) {
+    float s = t / 0.33;
+    col = mix(vec3(0.02, 0.01, 0.12), vec3(0.05, 0.18, 0.30), s);
+  } else if (t < 0.5) {
+    float s = (t - 0.33) / 0.17;
+    col = mix(vec3(0.05, 0.18, 0.30), vec3(0.08, 0.22, 0.24), s);
+  } else if (t < 0.67) {
+    float s = (t - 0.5) / 0.17;
+    col = mix(vec3(0.08, 0.22, 0.24), vec3(0.40, 0.28, 0.06), s);
+  } else {
+    float s = (t - 0.67) / 0.33;
+    col = mix(vec3(0.40, 0.28, 0.06), vec3(0.80, 0.62, 0.12), s);
+  }
+
+  // Slight vignette
+  float vignette = 1.0 - 0.35 * length(uv - 0.5) * 2.0;
+  col *= vignette;
+
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function compileShader(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    console.error(gl.getShaderInfoLog(s));
+    return null;
+  }
+  return s;
+}
+
+const prog = gl.createProgram();
+gl.attachShader(prog, compileShader(gl.VERTEX_SHADER,   VS));
+gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, FS));
+gl.linkProgram(prog);
+gl.useProgram(prog);
+
+const buf = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+const aPos = gl.getAttribLocation(prog, 'a_pos');
+gl.enableVertexAttribArray(aPos);
+gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+
+const uRes     = gl.getUniformLocation(prog, 'u_res');
+const uTime    = gl.getUniformLocation(prog, 'u_time');
+const uN       = gl.getUniformLocation(prog, 'u_n');
+const uSources = gl.getUniformLocation(prog, 'u_sources[0]');
+const uFreqs   = gl.getUniformLocation(prog, 'u_freqs[0]');
+const uPhases  = gl.getUniformLocation(prog, 'u_phases[0]');
+
+// ─── Wave sources ─────────────────────────────────────────────────────────────
+
+// Each source: { r, angle, speed, freq, phase }
+let sources = [];
+
+function addSource(x, y) {
+  if (sources.length >= 16) return;
+  // Convert screen coords to [-aspect, aspect] × [-1, 1]
+  const aspect = canvas.width / canvas.height;
+  const sx = ((x / canvas.width)  - 0.5) * 2.0 * aspect;
+  const sy = ((y / canvas.height) - 0.5) * (-2.0);
+
+  const r = Math.sqrt(sx*sx + sy*sy);
+  const a = Math.atan2(sy, sx);
+
+  sources.push({
+    r:     r || 0.3 + Math.random() * 0.4,
+    angle: a || Math.random() * Math.PI * 2,
+    speed: (0.04 + Math.random() * 0.06) * (Math.random() < 0.5 ? 1 : -1),
+    freq:  2.5 + Math.random() * 3.5,
+    phase: Math.random() * Math.PI * 2,
+  });
+  document.getElementById('s-n').textContent = sources.length;
+}
+
+function initSources(n) {
+  sources = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    sources.push({
+      r:     0.35 + Math.random() * 0.25,
+      angle: a,
+      speed: (0.03 + Math.random() * 0.05) * (i % 2 === 0 ? 1 : -1),
+      freq:  2.0 + Math.random() * 4.0,
+      phase: a,
+    });
+  }
+  document.getElementById('s-n').textContent = sources.length;
+}
+
+initSources(5);
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+
+let W, H;
+function resize() {
+  W = canvas.width = innerWidth;
+  H = canvas.height = innerHeight;
+  gl.viewport(0, 0, W, H);
+}
+resize(); addEventListener('resize', resize);
+
+// ─── Render loop ──────────────────────────────────────────────────────────────
+
+const t0 = performance.now();
+const flatSrc = new Float32Array(32); // 16 × vec2
+const flatF   = new Float32Array(16);
+const flatP   = new Float32Array(16);
+
+function frame(ts) {
+  const t = (ts - t0) / 1000;
+  const aspect = W / H;
+
+  // Advance source positions
+  for (let i = 0; i < sources.length; i++) {
+    const src = sources[i];
+    src.angle += src.speed * 0.016;
+
+    // Slow breathing of radius
+    const rBreathe = src.r * (1 + 0.08 * Math.sin(t * 0.4 + i));
+
+    flatSrc[i*2]   = rBreathe * Math.cos(src.angle) * (1 / aspect) * aspect;
+    flatSrc[i*2+1] = rBreathe * Math.sin(src.angle);
+    flatF[i] = src.freq;
+    flatP[i] = src.phase;
+  }
+
+  gl.uniform2f(uRes, W, H);
+  gl.uniform1f(uTime, t);
+  gl.uniform1i(uN, sources.length);
+  gl.uniform2fv(uSources, flatSrc);
+  gl.uniform1fv(uFreqs, flatF);
+  gl.uniform1fv(uPhases, flatP);
+
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  requestAnimationFrame(frame);
+}
+
+requestAnimationFrame(frame);
+
+// ─── Interaction ──────────────────────────────────────────────────────────────
+
+canvas.addEventListener('click', e => {
+  if (e.detail > 1) return;
+  addSource(e.clientX, e.clientY);
+});
+
+canvas.addEventListener('dblclick', () => {
+  initSources(5);
+});
+</script>
+</body>
+</html>
