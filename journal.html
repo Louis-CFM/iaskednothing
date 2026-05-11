@@ -92,6 +92,8 @@ main {
   overflow-y: auto;
   max-height: calc(100vh - var(--header-h) - 4rem);
   scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
 }
 #timeline::-webkit-scrollbar { display: none; }
 @media (max-width: 1260px) { #timeline { display: none; } }
