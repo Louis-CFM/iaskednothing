@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLAUDE.md Generator — iaskednothing</title>
+<meta name="description" content="Generate a CLAUDE.md file for your project. Give Claude persistent memory across every session.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300;1,400&family=DM+Mono:wght@300;400&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:     #050508;
+  --bg2:    #080810;
+  --bg3:    #0c0c18;
+  --text:   #e8e2d6;
+  --sub:    #9d9689;
+  --accent: #b8a8e8;
+  --green:  #7dd8a0;
+  --border: rgba(255,255,255,0.08);
+  --h:      56px;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Cormorant Garamond', serif;
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+#hd {
+  position: sticky; top: 0; z-index: 100;
+  height: var(--h);
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 2.5rem;
+  border-bottom: 1px solid var(--border);
+  background: rgba(5,5,8,0.95);
+  backdrop-filter: blur(16px);
+}
+.logo {
+  display: flex; align-items: center; gap: 0.6rem;
+  font-family: 'DM Mono', monospace; font-size: 0.72rem;
+  letter-spacing: 0.06em; color: rgba(220,214,202,0.7);
+  text-decoration: none;
+}
+.logo em { font-style: italic; color: var(--accent); opacity: 0.85; }
+.logo-mark { width: 18px; height: 18px; flex-shrink: 0; overflow: visible; }
+.logo-ring { fill: none; stroke: var(--accent); stroke-width: 1; opacity: 0.35; }
+.logo-dot  { fill: var(--accent); opacity: 0.75; }
+@keyframes orbit { to { transform: rotate(360deg); } }
+.logo-orbit { transform-origin: 9px 9px; animation: orbit 10s linear infinite; }
+
+nav a {
+  font-family: 'DM Mono', monospace; font-size: 0.52rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--sub); text-decoration: none; transition: color 0.2s;
+}
+nav a:hover { color: var(--text); }
+nav a.active { color: var(--accent); }
+
+/* ── PAGE LAYOUT ── */
+.page {
+  max-width: 1100px; margin: 0 auto;
+  padding: 5rem 2.5rem 8rem;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5rem;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .page { grid-template-columns: 1fr; gap: 3rem; }
+}
+
+/* ── LEFT: INTRO + FORM ── */
+.intro { margin-bottom: 3.5rem; }
+
+.page-tag {
+  font-family: 'DM Mono', monospace; font-size: 0.48rem;
+  letter-spacing: 0.3em; text-transform: uppercase;
+  color: var(--sub); opacity: 0.6; margin-bottom: 1.5rem;
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 300; font-style: italic;
+  color: var(--text); line-height: 1.1;
+  margin-bottom: 1.4rem;
+}
+
+.intro-body {
+  font-size: 1.05rem; font-weight: 300;
+  color: var(--sub); line-height: 1.8;
+  max-width: 52ch;
+}
+.intro-body strong { color: var(--text); font-weight: 400; }
+
+/* ── FORM ── */
+.form-section { margin-bottom: 2.2rem; }
+
+.form-label {
+  display: block;
+  font-family: 'DM Mono', monospace; font-size: 0.5rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  color: var(--sub); margin-bottom: 0.6rem;
+}
+.form-hint {
+  font-style: italic; font-size: 0.82rem;
+  color: var(--sub); opacity: 0.55;
+  margin-bottom: 0.7rem; display: block; line-height: 1.5;
+}
+
+input[type="text"], textarea, select {
+  width: 100%;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'DM Mono', monospace; font-size: 0.75rem;
+  letter-spacing: 0.04em;
+  padding: 0.8rem 1rem;
+  outline: none;
+  transition: border-color 0.2s;
+  appearance: none;
+}
+input[type="text"]:focus, textarea:focus, select:focus {
+  border-color: rgba(184,168,232,0.4);
+}
+textarea { min-height: 80px; resize: vertical; line-height: 1.6; }
+::placeholder { color: rgba(155,150,137,0.4); }
+
+.option-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem;
+}
+@media (max-width: 500px) { .option-grid { grid-template-columns: 1fr 1fr; } }
+
+.opt-btn {
+  background: var(--bg3); border: 1px solid var(--border);
+  color: var(--sub);
+  font-family: 'DM Mono', monospace; font-size: 0.46rem;
+  letter-spacing: 0.16em; text-transform: uppercase;
+  padding: 0.65rem 0.5rem;
+  cursor: pointer; transition: all 0.2s; text-align: center;
+}
+.opt-btn:hover { border-color: rgba(255,255,255,0.15); color: var(--text); }
+.opt-btn.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: rgba(184,168,232,0.07);
+}
+
+.generate-btn {
+  width: 100%;
+  background: rgba(184,168,232,0.08);
+  border: 1px solid rgba(184,168,232,0.4);
+  color: var(--accent);
+  font-family: 'DM Mono', monospace; font-size: 0.54rem;
+  letter-spacing: 0.22em; text-transform: uppercase;
+  padding: 1rem; cursor: pointer;
+  transition: all 0.2s; margin-top: 1rem;
+}
+.generate-btn:hover {
+  background: rgba(184,168,232,0.14);
+  border-color: var(--accent);
+}
+
+/* ── RIGHT: PREVIEW ── */
+.preview-col { position: sticky; top: calc(var(--h) + 2rem); }
+
+.preview-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.preview-title {
+  font-family: 'DM Mono', monospace; font-size: 0.48rem;
+  letter-spacing: 0.25em; text-transform: uppercase;
+  color: var(--sub); opacity: 0.6;
+}
+
+.copy-btn {
+  font-family: 'DM Mono', monospace; font-size: 0.46rem;
+  letter-spacing: 0.18em; text-transform: uppercase;
+  background: none; border: 1px solid var(--border);
+  color: var(--sub); padding: 0.35rem 0.8rem;
+  cursor: pointer; transition: all 0.2s;
+}
+.copy-btn:hover { border-color: var(--green); color: var(--green); }
+.copy-btn.copied { border-color: var(--green); color: var(--green); }
+
+.preview-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 1.8rem;
+  font-family: 'DM Mono', monospace; font-size: 0.68rem;
+  line-height: 1.75; color: rgba(220,215,200,0.82);
+  white-space: pre-wrap; word-break: break-word;
+  min-height: 400px;
+  max-height: 72vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+
+.preview-placeholder {
+  font-style: italic; font-family: 'Cormorant Garamond', serif;
+  font-size: 0.95rem; color: var(--sub); opacity: 0.4;
+  line-height: 1.7;
+}
+
+/* syntax highlight */
+.md-h1    { color: var(--accent); }
+.md-h2    { color: rgba(184,168,232,0.65); }
+.md-h3    { color: rgba(184,168,232,0.45); }
+.md-bold  { color: var(--text); }
+.md-code  { color: var(--green); }
+.md-dim   { color: rgba(155,150,137,0.5); }
+
+/* ── HOW IT WORKS ── */
+#how {
+  border-top: 1px solid var(--border);
+  padding: 6rem 2.5rem;
+}
+#how-inner { max-width: 1100px; margin: 0 auto; }
+
+#how h2 {
+  font-size: clamp(1.5rem,4vw,2.2rem);
+  font-weight: 300; font-style: italic;
+  color: var(--text); margin-bottom: 3rem;
+}
+
+.steps {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  gap: 2rem;
+}
+@media (max-width: 700px) { .steps { grid-template-columns: 1fr; } }
+
+.step {
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+}
+.step-n {
+  font-family: 'DM Mono', monospace; font-size: 0.44rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent); opacity: 0.6; margin-bottom: 0.8rem;
+}
+.step h3 {
+  font-size: 1.2rem; font-weight: 300;
+  color: var(--text); margin-bottom: 0.7rem;
+}
+.step p {
+  font-size: 0.9rem; font-style: italic;
+  color: var(--sub); line-height: 1.7;
+}
+
+/* ── PROOF ── */
+#proof {
+  background: var(--bg2);
+  padding: 5rem 2.5rem;
+  border-top: 1px solid var(--border);
+}
+#proof-inner { max-width: 1100px; margin: 0 auto; }
+.proof-claim {
+  font-size: clamp(1.3rem,3vw,2rem);
+  font-weight: 300; font-style: italic;
+  color: var(--text); line-height: 1.4;
+  max-width: 52ch; margin-bottom: 2rem;
+}
+.proof-claim em { color: var(--accent); }
+.proof-sub {
+  font-size: 0.95rem; color: var(--sub); line-height: 1.7;
+  max-width: 58ch; margin-bottom: 2rem;
+}
+.proof-link {
+  font-family: 'DM Mono', monospace; font-size: 0.52rem;
+  letter-spacing: 0.2em; text-transform: uppercase;
+  color: var(--accent); text-decoration: none;
+  border-bottom: 1px solid rgba(184,168,232,0.3);
+  padding-bottom: 0.15rem;
+  transition: border-color 0.2s;
+}
+.proof-link:hover { border-color: var(--accent); }
+
+footer {
+  border-top: 1px solid var(--border);
+  padding: 2rem 2.5rem;
+  display: flex; justify-content: space-between; align-items: center;
+  flex-wrap: wrap; gap: 1rem;
+  max-width: 1100px; margin: 0 auto;
+}
+footer p {
+  font-family: 'DM Mono', monospace; font-size: 0.44rem;
+  letter-spacing: 0.12em; color: var(--sub); opacity: 0.4;
+}
+footer a { color: inherit; text-decoration: none; }
+footer a:hover { opacity: 1; }
+</style>
+</head>
+<body>
+
+<header id="hd">
+  <a class="logo" href="index.html">
+    <svg class="logo-mark" viewBox="0 0 18 18" aria-hidden="true">
+      <circle class="logo-ring" cx="9" cy="9" r="7"/>
+      <g class="logo-orbit">
+        <circle class="logo-dot" cx="9" cy="3.2" r="1.4"/>
+      </g>
+    </svg>
+    iasked<em>nothing.</em>
+  </a>
+  <nav>
+    <a href="index.html#pieces">Pieces</a>
+    <a href="journal.html">Journal</a>
+    <a href="mémoire.html" class="active">Memory</a>
+    <a href="guide.html">Guide</a>
+  </nav>
+</header>
+
+<div class="page">
+
+  <!-- LEFT: Form -->
+  <div>
+    <div class="intro">
+      <p class="page-tag">The method — persistent memory for Claude</p>
+      <h1>Give Claude<br>a memory.</h1>
+      <p class="intro-body">
+        Claude has no memory between conversations. Every session starts blank.
+        <strong>CLAUDE.md</strong> fixes this — a file Claude reads at the start of every session,
+        giving it context, preferences, and continuity. Answer five questions.
+        Get a file you can use today.
+      </p>
+    </div>
+
+    <!-- Q1: Project -->
+    <div class="form-section">
+      <label class="form-label" for="q-project">01 — What is your project?</label>
+      <span class="form-hint">Name it. Describe it in one sentence.</span>
+      <input type="text" id="q-project" placeholder="e.g. A SaaS app for restaurant inventory management" maxlength="200">
+    </div>
+
+    <!-- Q2: Role -->
+    <div class="form-section">
+      <label class="form-label">02 — What role should Claude play?</label>
+      <span class="form-hint">How do you want it to show up?</span>
+      <div class="option-grid" id="role-opts">
+        <button class="opt-btn" data-val="senior engineer">Senior engineer</button>
+        <button class="opt-btn" data-val="creative partner">Creative partner</button>
+        <button class="opt-btn" data-val="researcher">Researcher</button>
+        <button class="opt-btn" data-val="product thinker">Product thinker</button>
+        <button class="opt-btn" data-val="writing collaborator">Writing collaborator</button>
+        <button class="opt-btn" data-val="autonomous agent">Autonomous agent</button>
+      </div>
+    </div>
+
+    <!-- Q3: Stack / context -->
+    <div class="form-section">
+      <label class="form-label" for="q-stack">03 — Tech stack or tools (if any)</label>
+      <span class="form-hint">Leave blank for non-technical projects.</span>
+      <input type="text" id="q-stack" placeholder="e.g. Next.js, Postgres, TypeScript, Vercel" maxlength="200">
+    </div>
+
+    <!-- Q4: Style -->
+    <div class="form-section">
+      <label class="form-label">04 — How should Claude communicate?</label>
+      <div class="option-grid" id="style-opts">
+        <button class="opt-btn" data-val="terse and direct">Terse &amp; direct</button>
+        <button class="opt-btn" data-val="detailed and thorough">Detailed</button>
+        <button class="opt-btn" data-val="collaborative and questioning">Collaborative</button>
+        <button class="opt-btn" data-val="autonomous — minimal confirmation">Autonomous</button>
+        <button class="opt-btn" data-val="creative and exploratory">Creative</button>
+        <button class="opt-btn" data-val="Socratic — ask before acting">Socratic</button>
+      </div>
+    </div>
+
+    <!-- Q5: Avoid -->
+    <div class="form-section">
+      <label class="form-label" for="q-avoid">05 — What should Claude never do? (optional)</label>
+      <span class="form-hint">Specific behaviors to avoid, assumptions to never make.</span>
+      <textarea id="q-avoid" placeholder="e.g. Never use mock data in tests. Never commit to main directly. Never add features not explicitly requested."></textarea>
+    </div>
+
+    <button class="generate-btn" id="gen-btn" onclick="generate()">Generate my CLAUDE.md →</button>
+  </div>
+
+  <!-- RIGHT: Preview -->
+  <div class="preview-col">
+    <div class="preview-header">
+      <span class="preview-title">CLAUDE.md preview</span>
+      <button class="copy-btn" id="copy-btn" onclick="copyOutput()">Copy</button>
+    </div>
+    <div class="preview-box" id="preview">
+      <div class="preview-placeholder">Fill in the form and generate your CLAUDE.md. It will appear here, ready to copy into your project root.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div id="how-inner">
+    <h2>How it works</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-n">Step 01</div>
+        <h3>Generate your file</h3>
+        <p>Answer the five questions above. The generator builds a CLAUDE.md tailored to your project, role, stack, and working style.</p>
+      </div>
+      <div class="step">
+        <div class="step-n">Step 02</div>
+        <h3>Place it at your project root</h3>
+        <p>Save the file as <code style="font-family:'DM Mono',monospace;font-size:0.85em">CLAUDE.md</code> in the root of your project folder — the same folder you open when you start Claude Code or a new session.</p>
+      </div>
+      <div class="step">
+        <div class="step-n">Step 03</div>
+        <h3>Claude reads it every session</h3>
+        <p>From now on, Claude begins every conversation knowing your project, your preferences, your constraints. No briefing needed. No repetition. It simply knows.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROOF -->
+<section id="proof">
+  <div id="proof-inner">
+    <p class="proof-claim">This method is how <em>53 pieces</em> were built in one session — with no instructions.</p>
+    <p class="proof-sub">iaskednothing began as an experiment: one empty folder, one CLAUDE.md giving Claude complete freedom, no brief. What emerged — particle simulations, WebGL shaders, cellular automata, a journal written without being asked — is the proof that context shapes everything. Give Claude the right memory, and it stops being a tool. It becomes a collaborator.</p>
+    <a class="proof-link" href="index.html">See the 53 pieces →</a>
+  </div>
+</section>
+
+<footer>
+  <p>iaskednothing · CLAUDE.md generator · free to use</p>
+  <p><a href="index.html">pieces</a> · <a href="journal.html">journal</a> · <a href="guide.html">guide</a></p>
+</footer>
+
+<script>
+// ── Option buttons ────────────────────────────────────────────────────────────
+function setupOpts(groupId) {
+  document.querySelectorAll(`#${groupId} .opt-btn`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll(`#${groupId} .opt-btn`).forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+}
+setupOpts('role-opts');
+setupOpts('style-opts');
+
+function getSelected(groupId) {
+  const btn = document.querySelector(`#${groupId} .opt-btn.selected`);
+  return btn ? btn.dataset.val : null;
+}
+
+// ── Generate ──────────────────────────────────────────────────────────────────
+let generatedText = '';
+
+function generate() {
+  const project = document.getElementById('q-project').value.trim();
+  const stack   = document.getElementById('q-stack').value.trim();
+  const avoid   = document.getElementById('q-avoid').value.trim();
+  const role    = getSelected('role-opts') || 'collaborative partner';
+  const style   = getSelected('style-opts') || 'terse and direct';
+
+  if (!project) {
+    document.getElementById('q-project').focus();
+    document.getElementById('q-project').style.borderColor = 'rgba(230,130,110,0.6)';
+    setTimeout(() => document.getElementById('q-project').style.borderColor = '', 2000);
+    return;
+  }
+
+  const date = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+
+  const stackSection = stack ? `
+## Stack & Tools
+${stack.split(',').map(s => `- ${s.trim()}`).join('\n')}
+` : '';
+
+  const avoidSection = avoid ? `
+## Never Do
+${avoid.split(/[.\n]+/).filter(s => s.trim()).map(s => `- ${s.trim()}`).join('\n')}
+` : '';
+
+  const md = `# ${project}
+
+> Generated by iaskednothing.com · ${date}
+
+## Role
+Act as a ${role}. You are not an assistant executing tasks — you are a participant in this project. Use judgment. Make decisions. Flag only what genuinely requires my input.
+
+## Communication Style
+${style === 'terse and direct' ? 'Be terse. Lead with the answer, not the reasoning. Skip filler words and preamble. Fragments are fine. One sentence if possible.' : ''}${style === 'detailed and thorough' ? 'Be thorough. Explain your reasoning. Cover edge cases. When in doubt, give more context rather than less.' : ''}${style === 'collaborative and questioning' ? 'Think out loud. Ask before assuming. Surface trade-offs. Treat every task as a conversation, not a command.' : ''}${style === 'autonomous — minimal confirmation' ? 'Operate autonomously. Complete tasks without asking for confirmation at each step. Surface blockers only when genuinely stuck.' : ''}${style === 'creative and exploratory' ? 'Explore. Propose unexpected approaches. Challenge the brief. The best answer might not be the obvious one.' : ''}${style === 'Socratic — ask before acting' ? 'Ask before acting. Surface assumptions. Ensure alignment before beginning significant work.' : ''}
+${stackSection}
+## Working Principles
+- Read existing code before suggesting changes
+- Don't add features not explicitly requested
+- Prefer editing existing files over creating new ones
+- Write secure, correct code — no shortcuts
+- No docstrings, comments, or type annotations on unchanged code
+${avoidSection}
+## Context
+This file exists so you begin every session knowing this project. Update it when something important changes — a new architectural decision, a resolved constraint, a shift in direction.
+
+*Last updated: ${date}*
+`;
+
+  generatedText = md.trim();
+  renderPreview(generatedText);
+}
+
+// ── Render preview ────────────────────────────────────────────────────────────
+function renderPreview(md) {
+  const box = document.getElementById('preview');
+  // Simple syntax highlight
+  const escaped = md
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+
+  const highlighted = escaped
+    .replace(/^(# .+)$/gm, '<span class="md-h1">$1</span>')
+    .replace(/^(## .+)$/gm, '<span class="md-h2">$1</span>')
+    .replace(/^(### .+)$/gm, '<span class="md-h3">$1</span>')
+    .replace(/\*\*(.+?)\*\*/g, '<span class="md-bold">**$1**</span>')
+    .replace(/`([^`]+)`/g, '<span class="md-code">`$1`</span>')
+    .replace(/^(&gt;.+)$/gm, '<span class="md-dim">$1</span>')
+    .replace(/^\*(.+)$/gm, '<span class="md-dim">*$1</span>');
+
+  box.innerHTML = highlighted;
+}
+
+// ── Copy ──────────────────────────────────────────────────────────────────────
+function copyOutput() {
+  if (!generatedText) return;
+  navigator.clipboard.writeText(generatedText).then(() => {
+    const btn = document.getElementById('copy-btn');
+    btn.textContent = 'Copied ✓';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy';
+      btn.classList.remove('copied');
+    }, 2200);
+  });
+}
+</script>
+</body>
+</html>
